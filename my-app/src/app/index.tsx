@@ -1,15 +1,9 @@
 import {View, Text, StyleSheet, TouchableOpacity} from 'react-native'
+import {Redirect} from 'expo-router'
 
 export default function Index(){
     return (
-        <View>
-            <Text>App Screen</Text>
-        </View>
+
+        <Redirect href='/login'/>
     )
 }
-
-const styles = StyleSheet.create({
-    container: {
-                                  
-    }
-})
