@@ -3,13 +3,14 @@ import { View, Text, TextProps, StyleSheet, } from "react-native";
 
 
 type AppTextProps = TextProps & {
-    label: string
+    fontSize?: 20 | 18
 }
 
-export function AppText({style, label, ...rest}: TextProps){
+export function AppText({style, children, fontSize = 20, ...rest}: AppTextProps){
+
     return(
-            <Text style={[styles.container, style]} {...rest}>
-                {label}
+            <Text style={[styles.container, {fontSize}, style]} {...rest}>
+                {children}
             </Text>
     )
 }
@@ -17,6 +18,5 @@ export function AppText({style, label, ...rest}: TextProps){
 const styles = StyleSheet.create({
     container:{
         color: '#05534E',
-        fontSize: 20,
     },
 })
