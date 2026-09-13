@@ -145,7 +145,7 @@ export default function signUp(){
                     {errors.ipBox && <AppText>{errors.ipBox.message}</AppText>}
                 </View>
 
-                <Button 
+                <Button
                     label={isLoading ? 'Aguarde...' : 'Cadastrar'}
                     onPress={ handleSubmit(handleSignUpData) }
                 />

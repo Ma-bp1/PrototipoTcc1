@@ -1,9 +1,9 @@
 import {View, Text, StyleSheet} from 'react-native'
 
-export default function Home(){
+export default function BoxConfig(){
     return (
         <View style = {styles.container}>
-            <Text>Home Screen</Text>
+            <Text>Box Config Screen</Text>
         </View>
     )
 }

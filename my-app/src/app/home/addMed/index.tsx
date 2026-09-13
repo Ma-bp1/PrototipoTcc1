@@ -1,9 +1,9 @@
 import {View, Text, StyleSheet} from 'react-native'
 
-export default function Home(){
+export default function AddMed(){
     return (
         <View style = {styles.container}>
-            <Text>Home Screen</Text>
+            <Text>Add Medicine Screen</Text>
         </View>
     )
 }
