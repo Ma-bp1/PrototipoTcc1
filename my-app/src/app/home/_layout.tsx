@@ -1,84 +1,107 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
+import { View, Pressable, StyleSheet } from 'react-native';
+import { BottomTabBarProps } from '@react-navigation/bottom-tabs'
+import { CustomTabButton } from '../../components/CustomTabButton';
 import Feather from '@expo/vector-icons/Feather';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+
+function CustomTabBar({state, navigation}: BottomTabBarProps) {
+    const router = useRouter();
+
+    const currentRoute = state.routes[state.index].name;
+    const isHome = currentRoute === 'index';
+
+    return (
+        <View style={styles.container}>
+            <CustomTabButton
+                icon='settings'
+                isFocused={currentRoute === 'appConfig/index'}
+                onPress={()=> navigation.navigate('appConfig/index')}
+            />
+            <CustomTabButton
+                icon='user'
+                isFocused={currentRoute === 'profile/index'}
+                onPress={()=> navigation.navigate('profile/index')}
+            />
+        
+            <View style={styles.centerButtonContainer}>
+                <Pressable
+                    style={({pressed})=>[
+                        styles.floatingButton,
+                        {opacity: pressed ? 0.5 : 1}
+                    ]}
+                    onPress={()=>{
+                        if (isHome) {
+                            navigation.navigate('addMed/index');
+                        } else {
+                            navigation.navigate('index');
+                        }
+                    }}
+                >
+                    <Feather
+                        name={isHome ? 'plus' : 'home'}
+                        size={26}
+                        color='#fff'
+                    />
+                </Pressable>
+            </View>
+
+            <CustomTabButton
+                icon='box'
+                isFocused={currentRoute === 'boxConfig/index'}
+                onPress={()=> navigation.navigate('boxConfig/index')}
+            />
+            <CustomTabButton
+                icon='pill'
+                isFocused={currentRoute === 'stock/index'}
+                onPress={()=> navigation.navigate('stock/index')}
+            />
+        </View>
+    )
+}
 
 export default function TabsLayout() {
     return (
         <Tabs
+            tabBar={(props)=> <CustomTabBar {...props}/>}
             screenOptions={{
-                tabBarActiveTintColor: '#FF6B8A',
-                tabBarShowLabel: false,
                 headerShown: false
             }}
         >
-            <Tabs.Screen name='index'
-                options={{
-                    tabBarIcon: ({color, size}) => (
-                        <Feather 
-                            name="home" 
-                            size={size} 
-                            color={color} 
-                        />
-                    ),
-                    
-                }}
-            />
-            <Tabs.Screen name='stock/index'
-                options={{
-                    tabBarIcon: ({color, size}) => (
-                        <MaterialCommunityIcons 
-                            name="pill" 
-                            size={size} 
-                            color={color} 
-                        />
-                    ),
-                }}
-            />
-            <Tabs.Screen name='profile/index'
-                options={{
-                    tabBarIcon: ({color, size}) => (
-                        <Feather 
-                            name="user" 
-                            size={size} 
-                            color={color}  
-                        />
-                    ),
-                }}
-            />
-            <Tabs.Screen name='boxConfig/index'
-                options={{
-                    tabBarIcon: ({color, size}) => (
-                        <Feather 
-                            name="box" 
-                            size={size} 
-                            color={color}  
-                        />
-                    ),
-                }}
-            />
-            <Tabs.Screen name='appConfig/index'
-                options={{
-                    tabBarIcon: ({color, size}) => (
-                        <Feather 
-                            name="settings" 
-                            size={size} 
-                            color={color} 
-                        />
-                    ),
-                }}
-            />
-            <Tabs.Screen name='addMed/index'
-                options={{
-                    tabBarIcon: ({color, size}) => (
-                        <Feather 
-                            name="plus-circle" 
-                            size={size} 
-                            color={color} 
-                        />
-                    ),
-                }}
-            />
+            <Tabs.Screen name='index'/>
+            <Tabs.Screen name='stock/index'/>
+            <Tabs.Screen name='profile/index'/>
+            <Tabs.Screen name='boxConfig/index'/>
+            <Tabs.Screen name='appConfig/index'/>
+            <Tabs.Screen name='addMed/index'/>
             <Tabs.Screen/>
         </Tabs>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        position:'absolute',
+        bottom: '7%',
+        width: '100%',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        flexDirection: 'row',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        height: 65,  
+    },
+    centerButtonContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: '#31AEAE',
+        top: -20,
+    },
+    floatingButton: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+})
