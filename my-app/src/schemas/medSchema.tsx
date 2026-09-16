@@ -20,11 +20,11 @@ export const medSchema = z.object({
     medTime: z.string().time(),
     medRepetitions: repetitionSchema,
     medName: z.string(),
-    medDosage: z.number(),
+    medSlot: z.number(),
     medStock: z.number(),
     medStockConsumption: z.number().positive(),
     medAdminRoute: z.string(),
-    medDescription: z.string(),
+    medDesc: z.string(),
     medIcon: z.string(),
 })
 
