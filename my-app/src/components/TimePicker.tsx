@@ -40,6 +40,8 @@ export default function TimePicker({ selectedHour, selectedMinute, onTimeChange 
         decelerationRate="fast"
         onMomentumScrollEnd={handleScrollHour}
         contentContainerStyle={styles.scrollContent}
+        nestedScrollEnabled={true}
+        contentOffset={{ x: 0, y: selectedHour * ITEM_HEIGHT }}
       >
         {hours.map((hour, index) => {
           const isSelected = Number(hour) === selectedHour;
@@ -60,6 +62,8 @@ export default function TimePicker({ selectedHour, selectedMinute, onTimeChange 
         decelerationRate="fast"
         onMomentumScrollEnd={handleScrollMinute}
         contentContainerStyle={styles.scrollContent}
+        nestedScrollEnabled={true}
+        contentOffset={{ x: 0, y: selectedHour * ITEM_HEIGHT }}
       >
         {minutes.map((minute, index) => {
           const isSelected = Number(minute) === selectedMinute;

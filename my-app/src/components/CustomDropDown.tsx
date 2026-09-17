@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 interface Option {
@@ -8,7 +8,7 @@ interface Option {
 }
 
 interface CustomDropdownProps {
-  label: string;
+  label?: string;
   options: Option[];
   selectedValue: string | number;
   onSelect: (value: string | number) => void;
@@ -20,10 +20,15 @@ export function CustomDropdown({ options, selectedValue, onSelect }: CustomDropd
   const selectedLabel = options.find((opt) => opt.value === selectedValue)?.label || 'Selecione';
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity style={styles.button} onPress={() => setIsOpen(!isOpen)}>
+    /* Boost zIndex dynamically when open so it layers over elements underneath */
+    <View style={[styles.container, isOpen && styles.activeContainer]}>
+      <TouchableOpacity 
+        style={styles.button} 
+        onPress={() => setIsOpen(!isOpen)}
+        activeOpacity={0.8}
+      >
         <Text style={styles.buttonText}>{selectedLabel}</Text>
-        <Feather name="chevron-down" size={20} color="#198982" />
+        <Feather name={isOpen ? "chevron-up" : "chevron-down"} size={20} color="#198982" />
       </TouchableOpacity>
 
       {isOpen && (
@@ -50,7 +55,12 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     marginVertical: 6,
-    zIndex: 10,
+    position: 'relative',
+    zIndex: 1, // Default low stacking order
+  },
+  activeContainer: {
+    zIndex: 1000, // Elevates the container over all other screen elements when open
+    elevation: 1000, // Android requirement for zIndex stacking
   },
   button: {
     flexDirection: 'row',
@@ -78,6 +88,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderRadius: 12,
     overflow: 'hidden',
+    zIndex: 1000,
     elevation: 5,
   },
   optionItem: {

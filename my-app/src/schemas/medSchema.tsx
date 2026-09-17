@@ -17,11 +17,11 @@ const repetitionSchema = z.discriminatedUnion('type', [
 ])
 
 export const medSchema = z.object({
-    medTime: z.string().time(),
+    medTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, 'Horário inválido. Use o formato HH:mm'),
     medRepetitions: repetitionSchema,
     medName: z.string(),
-    medSlot: z.number(),
-    medStock: z.number(),
+    medSlot: z.string(),
+    medStock: z.number().positive(),
     medStockConsumption: z.number().positive(),
     medAdminRoute: z.string(),
     medDesc: z.string(),

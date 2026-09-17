@@ -2,17 +2,24 @@ import { Tabs, useRouter } from 'expo-router';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import { CustomTabButton } from '../../components/CustomTabButton';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 function CustomTabBar({state, navigation}: BottomTabBarProps) {
     const router = useRouter();
+    const insets = useSafeAreaInsets()
 
     const currentRoute = state.routes[state.index].name;
     const isHome = currentRoute === 'index';
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, 
+            {
+                paddingBottom: insets.bottom > 0 ? insets.bottom : 15,
+                height: 65 + (insets.bottom > 0 ? insets.bottom : 15)
+            }
+        ]}>
             <CustomTabButton
                 icon='settings'
                 isFocused={currentRoute === 'appConfig/index'}
@@ -82,7 +89,7 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
     container: {
         position:'absolute',
-        bottom: '7%',
+        bottom: 0,
         width: '100%',
         alignItems: 'center',
         backgroundColor: '#fff',
