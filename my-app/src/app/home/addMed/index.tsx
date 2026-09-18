@@ -50,12 +50,12 @@ export default function AddMed(){
         setIsLoading(true)
         try {
             const userId = auth.currentUser?.uid
-/* 
+
             if (!userId) {
                 Alert.alert('Erro, usuário não está logado')
                 setIsLoading(false)
                 return
-            } */
+            }
 
             const userMedsCollection = collection(db, 'users', userId, 'medications')
 
@@ -65,12 +65,22 @@ export default function AddMed(){
             })
 
             Alert.alert('Medicamento cadastrado com sucesso.')
-            router.push('/index') 
+            router.push('/home') 
         } catch (error) {
             console.error('Erro ao salvar medicamento no Firestore:', error)
             Alert.alert('Não foi possível salvar o medicamento.')
         } finally {
             setIsLoading(false)
+        }
+    }
+
+    const testFirestore = async () => {
+        try {
+            const testDocRef = collection(db, 'test_collection');
+            await addDoc(testDocRef, { test: "Hello World", time: new Date() });
+            console.log("Sucesso! Firestore está funcionando.");
+        } catch (error) {
+            console.error("Erro no Firestore:", error);
         }
     }
 
@@ -82,30 +92,41 @@ export default function AddMed(){
                 showsVerticalScrollIndicator={false}
             >
                 <Text>Add Medicine Screen</Text>
-                <AppText>Horário de Administração</AppText>
 
-                <Controller
-                    control={control}
-                    name="medTime"
-                    render={({ field: { value, onChange } }) => {
-                        // Extrai hora e minuto da string 'HH:mm'
-                        const [currentHour, currentMinute] = (value || '16:01').split(':').map(Number);
+                <TouchableOpacity 
+                    onPress={testFirestore}
+                    style={[styles.button, { backgroundColor: '#FF6B81', marginBottom: 20 }]}
+                >
+                    <Text>testar Firestore</Text>
 
-                        return (
-                            <TimePicker
-                                selectedHour={currentHour}
-                                selectedMinute={currentMinute}
-                                onTimeChange={(hour, minute) => {
-                                    const formattedTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-                                    onChange(formattedTime); // Atualiza o valor no useForm
-                                }}
-                            />
-                        );
-                    }}
-                />
-                {errors.medTime && <AppText style={{ color: 'red' }}>{errors.medTime.message}</AppText>}
+                </TouchableOpacity>
 
-                <AppText>Repetições?</AppText>
+                <View style={{flex: 1, alignItems: 'center', justifyContent: 'center', margin: 30}}>
+                    <AppText style={{margin: 10,}}>Horário de Administração</AppText>
+                    <Controller
+                        control={control}
+                        name="medTime"
+                        render={({ field: { value, onChange } }) => {
+                            
+                            const [currentHour, currentMinute] = (value || '16:01').split(':').map(Number);
+
+                            return (
+                                <TimePicker
+                                    selectedHour={currentHour}
+                                    selectedMinute={currentMinute}
+                                    onTimeChange={(hour, minute) => {
+                                        const formattedTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+                                        onChange(formattedTime); // Atualiza o valor no useForm
+                                    }}
+                                />
+                            );
+                        }}
+                    />
+                    {errors.medTime && <AppText style={{ color: 'red' }}>{errors.medTime.message}</AppText>}
+                </View>
+                
+
+                <AppText style={{textAlign: 'center'}}>Repetições</AppText>
                 <View style={styles.row}>
                     <AppText>A cada X horas</AppText>
                     <Switch
@@ -125,9 +146,10 @@ export default function AddMed(){
                         control={control}
                         name="medRepetitions"
                         render={() => (
-                            <View style={styles.subContainer}>
+                            <View style={[styles.subContainer, {}]}>
                                 <AppText>Intervalo em horas:</AppText>
                                 <Input
+                                    
                                     keyboardType="numeric"
                                     placeholder="8"
                                     onChangeText={(text) => {
@@ -185,22 +207,24 @@ export default function AddMed(){
                 )}
                 {errors.medRepetitions && <AppText style={{ color: 'red' }}>Erro nas repetições</AppText>}
 
-
-                <AppText>Nome do medicamento</AppText>
-                <Controller
-                    control={control}
-                    name='medName'
-                    render= {({field: {onChange, onBlur, value} }) => (
-                        <Input 
-                            placeholder=''
-                            onBlur={onBlur}
-                            onChangeText={onChange}
-                            value={value}
-                            style={{backgroundColor:'#DEE6E6', borderColor: '#198982', borderWidth: 3, margin: '5%'}}
-                        />
-                    )}
-                />
-                {errors.medName && <AppText>{errors.medName.message}</AppText>}
+                <View style={{flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 10, marginBottom: 10}}>
+                    <AppText style={{textAlign: 'left', width: '100%'}}>Nome do medicamento</AppText>
+                    <Controller
+                        control={control}
+                        name='medName'
+                        render= {({field: {onChange, onBlur, value} }) => (
+                            <Input 
+                                placeholder=''
+                                onBlur={onBlur}
+                                onChangeText={onChange}
+                                value={value}
+                                style={{backgroundColor:'#DEE6E6', borderColor: '#198982', borderWidth: 2, margin: '5%', height: 70}}
+                            />
+                        )}
+                    />
+                    {errors.medName && <AppText>{errors.medName.message}</AppText>}
+                </View>
+                
 
                 <AppText>Slot:</AppText>
                 <Controller
@@ -262,22 +286,23 @@ export default function AddMed(){
                     )}
                 />
 
-                <AppText> Descrição: </AppText>
-                <Controller
-                    control={control}
-                    name='medDesc'
-                    render= {({field: {onChange, onBlur, value} }) => (
-                        <Input 
-                            placeholder=''
-                            onBlur={onBlur}
-                            onChangeText={onChange}
-                            value={value}
-                            style={{backgroundColor:'#DEE6E6', borderColor: '#198982', borderWidth: 3, margin: '5%'}}
-                        />
-                    )}
-                />
-                {errors.medDesc && <AppText>{errors.medDesc.message}</AppText>}
-
+                <View style={{flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 10, marginBottom: 10}}>
+                    <AppText style={{textAlign: 'left', width: '100%'}}>Descrição</AppText>
+                    <Controller
+                        control={control}
+                        name='medDesc'
+                        render= {({field: {onChange, onBlur, value} }) => (
+                            <Input 
+                                placeholder=''
+                                onBlur={onBlur}
+                                onChangeText={onChange}
+                                value={value}
+                                style={{backgroundColor:'#DEE6E6', borderColor: '#198982', borderWidth: 2, margin: '5%', height: 70}}
+                            />
+                        )}
+                    />
+                    {errors.medName && <AppText>{errors.medName.message}</AppText>}
+                </View>
 
                 <Button 
                     style={{marginBottom: 130}} 

@@ -31,49 +31,49 @@ export default function TimePicker({ selectedHour, selectedMinute, onTimeChange 
 
     return (
         <View style={styles.pickerContainer}>
-      <View style={styles.highlightBox} />
+          <View style={styles.highlightBox} />
 
-      {/* Horas */}
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        snapToInterval={ITEM_HEIGHT}
-        decelerationRate="fast"
-        onMomentumScrollEnd={handleScrollHour}
-        contentContainerStyle={styles.scrollContent}
-        nestedScrollEnabled={true}
-        contentOffset={{ x: 0, y: selectedHour * ITEM_HEIGHT }}
-      >
-        {hours.map((hour, index) => {
-          const isSelected = Number(hour) === selectedHour;
-          return (
-            <View key={index} style={styles.itemContainer}>
-              <Text style={[styles.text, isSelected && styles.selectedText]}>{hour}</Text>
-            </View>
-          );
-        })}
-      </ScrollView>
+          {/* Horas */}
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            snapToInterval={ITEM_HEIGHT}
+            decelerationRate="fast"
+            onMomentumScrollEnd={handleScrollHour}
+            contentContainerStyle={styles.scrollContent}
+            nestedScrollEnabled={true}
+            contentOffset={{ x: 0, y: selectedHour * ITEM_HEIGHT }}
+          >
+            {hours.map((hour, index) => {
+              const isSelected = Number(hour) === selectedHour;
+              return (
+                <View key={index} style={styles.itemContainer}>
+                  <Text style={[styles.text, isSelected && styles.selectedText]}>{hour}</Text>
+                </View>
+              );
+            })}
+          </ScrollView>
 
-      <Text style={styles.separator}>:</Text>
+          <Text style={styles.separator}>:</Text>
 
-      {/* Minutos */}
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        snapToInterval={ITEM_HEIGHT}
-        decelerationRate="fast"
-        onMomentumScrollEnd={handleScrollMinute}
-        contentContainerStyle={styles.scrollContent}
-        nestedScrollEnabled={true}
-        contentOffset={{ x: 0, y: selectedHour * ITEM_HEIGHT }}
-      >
-        {minutes.map((minute, index) => {
-          const isSelected = Number(minute) === selectedMinute;
-          return (
-            <View key={index} style={styles.itemContainer}>
-              <Text style={[styles.text, isSelected && styles.selectedText]}>{minute}</Text>
-            </View>
-          );
-        })}
-      </ScrollView>
+          {/* Minutos */}
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            snapToInterval={ITEM_HEIGHT}
+            decelerationRate="fast"
+            onMomentumScrollEnd={handleScrollMinute}
+            contentContainerStyle={styles.scrollContent}
+            nestedScrollEnabled={true}
+            contentOffset={{ x: 0, y: selectedHour * ITEM_HEIGHT }}
+          >
+            {minutes.map((minute, index) => {
+              const isSelected = Number(minute) === selectedMinute;
+              return (
+                <View key={index} style={styles.itemContainer}>
+                  <Text style={[styles.text, isSelected && styles.selectedText]}>{minute}</Text>
+                </View>
+              );
+            })}
+          </ScrollView>
     </View>
   );
 }
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   },
   separator: {
     fontSize: 36,
-    color: '#008577',
+    color: '#ffffff',
     marginHorizontal: 10,
     fontWeight: 'bold',
   },
