@@ -1,4 +1,4 @@
-import {View, Text, StyleSheet, ScrollView, Alert} from 'react-native'
+import {View, StyleSheet, ScrollView, Alert, Image} from 'react-native'
 import { useState } from 'react'
 import {Button} from '../../components/Button'
 import {Input} from '../../components/Input'
@@ -52,7 +52,14 @@ export default function signUp(){
     return (
         <ScrollView>
             <View style={styles.container}>
-                <Text>Tela Cadastro</Text>
+                <View>
+                    <Image source={require('../../../assets/Chronomedi.png')}
+                        style={{height: 200, width: 250}}
+                    />
+                </View>
+                <AppText style={{fontWeight: 'bold', fontSize: 26, marginBottom: 30}}> 
+                    Cadastro 
+                </AppText>
                 
                 <AppText> Nome Completo </AppText>
                 <View style={{width: '90%'}}>
@@ -61,6 +68,13 @@ export default function signUp(){
                         name='fullName'
                         render= {({field: {onChange, onBlur, value} }) => (
                             <Input 
+                                style={{
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.05,
+                                    shadowRadius: 6,
+                                    elevation: 4,
+                                }}
                                 placeholder=''
                                 onBlur={onBlur}
                                 onChangeText={onChange}
@@ -78,6 +92,13 @@ export default function signUp(){
                         name='email'
                         render= {({field: {onChange, onBlur, value} }) => (
                             <Input 
+                                style={{
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.05,
+                                    shadowRadius: 6,
+                                    elevation: 4,
+                                }}
                                 placeholder=''
                                 onBlur={onBlur}
                                 onChangeText={onChange}
@@ -97,6 +118,13 @@ export default function signUp(){
                         name='password'
                         render= {({field: {onChange, onBlur, value} }) => (
                             <Input 
+                                style={{
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.05,
+                                    shadowRadius: 6,
+                                    elevation: 4,
+                                }}
                                 placeholder=''
                                 onBlur={onBlur}
                                 onChangeText={onChange}
@@ -116,6 +144,13 @@ export default function signUp(){
                         name='confirmPassword'
                         render= {({field: {onChange, onBlur, value} }) => (
                             <Input 
+                                style={{
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.05,
+                                    shadowRadius: 6,
+                                    elevation: 4,
+                                }}
                                 placeholder=''
                                 onBlur={onBlur}
                                 onChangeText={onChange}
@@ -134,7 +169,14 @@ export default function signUp(){
                         control={control}
                         name='ipBox'
                         render= {({field: {onChange, onBlur, value} }) => (
-                            <Input 
+                            <Input
+                                style={{
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.05,
+                                    shadowRadius: 6,
+                                    elevation: 4,
+                                }}
                                 placeholder=''
                                 onBlur={onBlur}
                                 onChangeText={onChange}
@@ -158,6 +200,8 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         justifyContent: 'center',
-        alignItems: 'center'
+        alignItems: 'center',
+        marginTop: 100,
+        marginBottom: 100,
     }
 })

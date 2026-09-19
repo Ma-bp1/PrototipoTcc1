@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     height: ITEM_HEIGHT,
     width: '100%',
-    backgroundColor: '#FF6B81',
+    backgroundColor: '#F98296',
     borderRadius: 16,
     top: ITEM_HEIGHT,
   },
@@ -106,8 +106,8 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 36,
-    color: '#008577',
-    fontWeight: '300',
+    color: '#31AEAE',
+    fontWeight: '400',
   },
   selectedText: {
     color: '#FFFFFF',

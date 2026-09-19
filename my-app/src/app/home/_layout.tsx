@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
         width: 56,
         height: 56,
         borderRadius: 28,
-        backgroundColor: '#31AEAE',
+        backgroundColor: '#50CFC7',
         top: -20,
     },
     floatingButton: {

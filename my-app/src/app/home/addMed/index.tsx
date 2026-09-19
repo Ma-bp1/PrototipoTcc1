@@ -74,16 +74,6 @@ export default function AddMed(){
         }
     }
 
-    const testFirestore = async () => {
-        try {
-            const testDocRef = collection(db, 'test_collection');
-            await addDoc(testDocRef, { test: "Hello World", time: new Date() });
-            console.log("Sucesso! Firestore está funcionando.");
-        } catch (error) {
-            console.error("Erro no Firestore:", error);
-        }
-    }
-
     return (
         <View style = {styles.container}>
             <ScrollView
@@ -91,18 +81,11 @@ export default function AddMed(){
                 nestedScrollEnabled={true}
                 showsVerticalScrollIndicator={false}
             >
-                <Text>Add Medicine Screen</Text>
-
-                <TouchableOpacity 
-                    onPress={testFirestore}
-                    style={[styles.button, { backgroundColor: '#FF6B81', marginBottom: 20 }]}
-                >
-                    <Text>testar Firestore</Text>
-
-                </TouchableOpacity>
 
                 <View style={{flex: 1, alignItems: 'center', justifyContent: 'center', margin: 30}}>
-                    <AppText style={{margin: 10,}}>Horário de Administração</AppText>
+                    <AppText style={{margin: 10,}}>
+                        Registrar Horário
+                    </AppText>
                     <Controller
                         control={control}
                         name="medTime"
@@ -236,6 +219,10 @@ export default function AddMed(){
                             options={[
                                 { label: 'Slot 1', value: 'slot_1' },
                                 { label: 'Slot 2', value: 'slot_2' },
+                                { label: 'Slot 3', value: 'slot_3' },
+                                { label: 'Slot 4', value: 'slot_4' },
+                                { label: 'Slot 5', value: 'slot_5' },
+                                { label: 'Slot 6', value: 'slot_6' },
                             ]}
                             selectedValue={value}
                             onSelect={onChange}
@@ -251,8 +238,9 @@ export default function AddMed(){
                         <CustomDropdown
                             label="Slot"
                             options={[
-                                { label: 'Slot 1', value: 'slot_1' },
-                                { label: 'Slot 2', value: 'slot_2' },
+                                {label: 'Oral', value: 'oral'},
+                                {label: 'Sublingual', value: 'subl'},
+                                {label: 'Venosa', value: 'veno'},
                             ]}
                             selectedValue={value}
                             onSelect={onChange}
@@ -273,7 +261,7 @@ export default function AddMed(){
                     )}
                 />
 
-                <AppText>Quantidade a Ser Colocada no Slot:</AppText>
+                <AppText>Quantidade de medicamentos a serem consumidos por dose:</AppText>
                 <Controller
                     control={control}
                     name="medStockConsumption" 
