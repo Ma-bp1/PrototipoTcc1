@@ -3,7 +3,7 @@ import { z } from 'zod'
 export const loginSchema = z.object({
     email: z.email(),
     password: z.string().min(6),
-    ipBox: z.string()
+    ipBox: z.ipv4()
 })
 
 export type LoginData = z.infer<typeof loginSchema>
