@@ -32,7 +32,7 @@ export default function Home(){
         try{
             const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, data.password)
 
-            console.log('Usuário logado com sucesso. Credenciais:', userCredential.user)
+            console.log('Usuário logado com sucesso. Credenciais:', auth.currentUser?.email)
 
             /* router.replace('/home') -> adicionar para o usuário não poder 'voltar' a tela de login*/
 

@@ -46,13 +46,15 @@ export default function Home(){
             const userMedsCollection = collection(db, 'users', userId, 'medications')
             const querySnapshot = await getDocs(userMedsCollection)
 
+            console.log('Medicação alcançada')
+
             const medsList: Medication[] = []
             querySnapshot.forEach((doc) => {
                 medsList.push({ id: doc.id, ...doc.data() } as Medication)
             })
 
             setMedications(medsList)
-        } catch (error) {
+        } catch (error: any) {
             console.error('Erro ao buscar medicamentos no Firestore:', error)
             Alert.alert('Não foi possível carregar os slots.')
         } finally {
