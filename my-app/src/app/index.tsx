@@ -34,6 +34,6 @@ export default function Index(){
 
     return (
 
-        <Redirect href='/login'/>
+        <Redirect href='/welcome'/>
     )
 }
