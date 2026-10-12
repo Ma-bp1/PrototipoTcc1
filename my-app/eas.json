@@ -16,6 +16,8 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "node": "26.5.1"
+    }
   }
 }
