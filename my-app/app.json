@@ -14,7 +14,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.mari020.myapp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -31,6 +32,13 @@
           "backgroundColor": "#ffffff"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "dbfc7a02-3148-4a17-a94a-51e8c56f1936"
+      }
+    },
+    "owner": "mari020"
   }
 }
