@@ -10,11 +10,15 @@ import { Feather } from '@expo/vector-icons'
 import { MedData } from '../../schemas/medSchema'
 import { boolean } from 'zod'
 
+import LembreteCards from '../../components/LembreteCards'
+import { useDoseActions } from '../../hooks/useDoseActions'
+
 type Medication = MedData & {id: string}
 
 
 export default function Home(){
     const [medications, setMedications] = useState<Medication[]>([])
+    const { confirmarDose, adiarDose } = useDoseActions(medications, setMedications)
     const [isLoading, setIsLoading] = useState(true)
 
     const caixaLigada = useState(false)
@@ -106,20 +110,11 @@ export default function Home(){
                     Lembretes
                 </AppText>
 
-                <View style={styles.lembretes}>
-                    <View style={styles.lembreteHeader}>
-                        <Text style={{fontWeight: 'bold', fontSize: 21, flex: 1, textAlign: 'left', color: '#D3344D' }}> 
-                            Dipirona 
-                        </Text>
-                        <Text style={{fontSize: 21, flex: 1, textAlign: 'right', color: '#EC516A' }}> 15:30 </Text>
-                    </View>
-
-                    <View style={styles.lembreteButtons}>
-                        <QuestionButton/>
-                        <Button label='Confirmar Dose' variant='grey'/>
-                        <Button label='Adiar' variant='grey'/>
-                    </View>
-                </View>
+                <LembreteCards 
+                    medications={medications}
+                    onConfirmar={confirmarDose}
+                    onAdiar={adiarDose}
+                />
 
                 <AppText style={{flex: 1, margin: 15, fontSize: 26}}> 
                     Slots da Caixa 

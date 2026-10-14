@@ -26,6 +26,8 @@ export const medSchema = z.object({
     medAdminRoute: z.string(),
     medDesc: z.string(),
     medIcon: z.string(),
+    medLastConfirmed: z.number().optional(),
+    medSnoozedUntil: z.number().optional(),
 })
 
 export type MedData = z.infer<typeof medSchema>
