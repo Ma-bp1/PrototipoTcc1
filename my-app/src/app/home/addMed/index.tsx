@@ -61,7 +61,7 @@ export default function AddMed(){
 
             await addDoc(userMedsCollection, {
                 ...data,
-                createdA: new Date()
+                createdAt: new Date()
             })
 
             Alert.alert('Medicamento cadastrado com sucesso.')

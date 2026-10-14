@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet, Alert, ScrollView, TouchableOpacity, Image } from 'react-native'
-import React, { useState, useEffect } from 'react'
+import { View, Text, StyleSheet, Alert, ScrollView, TouchableOpacity, Image, Pressable } from 'react-native'
+import React, { useState, useEffect, } from 'react'
 import { collection, getDocs } from 'firebase/firestore'
 import { auth, db } from '../../config/firebaseConfig'
 
@@ -7,20 +7,11 @@ import { AppText } from '../../components/AppText'
 import { Button } from '../../components/Button'
 import { QuestionButton } from '../../components/QuestionButton'
 import { Feather } from '@expo/vector-icons'
+import { MedData } from '../../schemas/medSchema'
 import { boolean } from 'zod'
 
-interface Medication {
-    id: string,
-    medName: string,
-    medRepetitions?: {
-        medSlot: string,
-        medTime: string,
-        medStock: number,
-        medStockConsumption: number,
-    }
-    
-    /* isLowStock?: boolean */
-}
+type Medication = MedData & {id: string}
+
 
 export default function Home(){
     const [medications, setMedications] = useState<Medication[]>([])
@@ -37,6 +28,7 @@ export default function Home(){
     const fetchMedications = async () => {
         try {
             const userId = auth.currentUser?.uid
+            console.log('UID:', userId)
 
             if (!userId) {
                 setIsLoading(false)
@@ -44,12 +36,15 @@ export default function Home(){
             }
 
             const userMedsCollection = collection(db, 'users', userId, 'medications')
+            console.log('Path:', userMedsCollection.path)
+            
             const querySnapshot = await getDocs(userMedsCollection)
-
-            console.log('Medicação alcançada')
+            console.log('Vazio?', querySnapshot.empty)
+            
 
             const medsList: Medication[] = []
             querySnapshot.forEach((doc) => {
+                console.log('Doc:', doc.id, doc.data())
                 medsList.push({ id: doc.id, ...doc.data() } as Medication)
             })
 
@@ -132,10 +127,10 @@ export default function Home(){
                 
                 {/* slots */}
                 {totalSlots.map((slotNumber) => {
-                    const med = medications.find((m) => Number(m.medRepetitions?.medSlot === `slot_${slotNumber}`) === slotNumber)
+                    const med = medications.find((m) => m.medSlot === `slot_${slotNumber}`)
 
                     const isLowStock = med?.medRepetitions
-                        ? med.medRepetitions.medStock <= med.medRepetitions.medStockConsumption
+                        ? med.medStock <= med.medStockConsumption
                         : false
 
                     return (
@@ -154,11 +149,11 @@ export default function Home(){
                                 </View>
 
                                 <AppText>
-                                    Nome: {med ? med.medName : 'Vazio'}
+                                    Nome: {med ? med.medName : ''}
                                 </AppText>
 
                                 <AppText>
-                                   {`Horário: ${med ? med.medRepetitions?.medTime : '--:--'}`}
+                                   {`Horário: ${med ? med.medTime : ''}`}
                                 </AppText>
 
                             </View>
