@@ -1,12 +1,36 @@
 import { Tabs, useRouter } from 'expo-router';
-import { View, Pressable, StyleSheet } from 'react-native';
-import { BottomTabBarProps } from '@react-navigation/bottom-tabs'
+import { View, Pressable, StyleSheet, Text } from 'react-native';
 import { CustomTabButton } from '../../components/CustomTabButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
-function CustomTabBar({state, navigation}: BottomTabBarProps) {
+const corHeader = '#31AEAE'
+
+function BackButton() {
+    const router = useRouter()
+
+    return (
+        <Pressable
+            onPress={() => {
+                if (router.canGoBack()) {
+                    router.back();
+                } else {
+                    router.replace('/home');
+                }
+            }}
+            hitSlop={10}
+            style={({ pressed }) => ({
+                marginLeft: 16,
+                opacity: pressed ? 0.5 : 1,
+            })}
+        >
+
+            <Feather name='arrow-left' size={26} color='#fff' />
+        </Pressable>
+    )
+}
+
+function CustomTabBar({state, navigation}: { state: any; navigation: any }) {
     const router = useRouter();
     const insets = useSafeAreaInsets()
 
@@ -71,16 +95,33 @@ export default function TabsLayout() {
     return (
         <Tabs
             tabBar={(props)=> <CustomTabBar {...props}/>}
-            screenOptions={{
-                headerShown: false
-            }}
+            screenOptions={({ route }) => ({
+                headerShown: route.name !== 'index',
+                headerStyle: { backgroundColor: corHeader },
+                headerShadowVisible: false,
+                headerTitleAlign: 'center',
+                headerLeft: () => <BackButton />,
+                headerTitle: ({ children }) => (
+                    <Text
+                        numberOfLines={2}
+                        style={{
+                            color: '#fff',
+                            fontSize: 20,
+                            fontWeight: '600',
+                            textAlign: 'center',
+                        }}
+                    >
+                        {children}
+                    </Text>
+                ),
+            })}
         >
             <Tabs.Screen name='index'/>
-            <Tabs.Screen name='stock/index'/>
-            <Tabs.Screen name='profile/index'/>
-            <Tabs.Screen name='boxConfig/index'/>
-            <Tabs.Screen name='appConfig/index'/>
-            <Tabs.Screen name='addMed/index'/>
+            <Tabs.Screen name='stock/index' options={{ title: 'Estoque' }}/>
+            <Tabs.Screen name='profile/index' options={{ title: 'Perfil' }}/>
+            <Tabs.Screen name='boxConfig/index' options={{ title: 'Configurações da Caixa' }}/>
+            <Tabs.Screen name='appConfig/index' options={{ title: 'Configurações' }} />
+            <Tabs.Screen name='addMed/index' options={{ title: 'Cadastro de Medicamento' }}/>
             <Tabs.Screen/>
         </Tabs>
     );

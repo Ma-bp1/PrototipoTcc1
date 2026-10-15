@@ -1,69 +1,34 @@
 import { View, Text, StyleSheet, Alert, ScrollView, TouchableOpacity, Image, Pressable } from 'react-native'
-import React, { useState, useEffect, } from 'react'
-import { collection, getDocs } from 'firebase/firestore'
-import { auth, db } from '../../config/firebaseConfig'
-
-import { AppText } from '../../components/AppText'
-import { Button } from '../../components/Button'
-import { QuestionButton } from '../../components/QuestionButton'
+import { useState } from 'react'
 import { Feather } from '@expo/vector-icons'
 import { MedData } from '../../schemas/medSchema'
 import { boolean } from 'zod'
 
+import { AppText } from '../../components/AppText'
 import LembreteCards from '../../components/LembreteCards'
+import { HomeSlots } from '../../components/HomeSlots'
+import { useMedications } from '../../hooks/useMedication'
 import { useDoseActions } from '../../hooks/useDoseActions'
 
-type Medication = MedData & {id: string}
+
+/* revise this: like, what is this?
+type Medication = MedDataimport { HomeSlots } from '../../components/HomeSlots'
+ & {id: string} */
 
 
 export default function Home(){
-    const [medications, setMedications] = useState<Medication[]>([])
-    const { confirmarDose, adiarDose } = useDoseActions(medications, setMedications)
-    const [isLoading, setIsLoading] = useState(true)
-
+    
     const caixaLigada = useState(false)
 
-    const totalSlots= [1, 2, 3, 4, 5, 6]
-
-    useEffect(() => {
-        fetchMedications()
-    }, [])
-
-    const fetchMedications = async () => {
-        try {
-            const userId = auth.currentUser?.uid
-            console.log('UID:', userId)
-
-            if (!userId) {
-                setIsLoading(false)
-                return
-            }
-
-            const userMedsCollection = collection(db, 'users', userId, 'medications')
-            console.log('Path:', userMedsCollection.path)
-            
-            const querySnapshot = await getDocs(userMedsCollection)
-            console.log('Vazio?', querySnapshot.empty)
-            
-
-            const medsList: Medication[] = []
-            querySnapshot.forEach((doc) => {
-                console.log('Doc:', doc.id, doc.data())
-                medsList.push({ id: doc.id, ...doc.data() } as Medication)
-            })
-
-            setMedications(medsList)
-        } catch (error: any) {
-            console.error('Erro ao buscar medicamentos no Firestore:', error)
-            Alert.alert('Não foi possível carregar os slots.')
-        } finally {
-            setIsLoading(false)
-        }
-    }
+    const { medications, setMedications, isLoading, refetch } = useMedications()
+    const { confirmarDose, adiarDose } = useDoseActions(medications, setMedications)
+    
 
     return (
         <View style = {styles.container}>
-            <ScrollView>
+            <ScrollView
+                contentContainerStyle={{paddingBottom: 130}}
+            >
                 <Text>Home Screen</Text>
 
                 <View style={styles.header}>
@@ -120,45 +85,10 @@ export default function Home(){
                     Slots da Caixa 
                 </AppText>
                 
-                {/* slots */}
-                {totalSlots.map((slotNumber) => {
-                    const med = medications.find((m) => m.medSlot === `slot_${slotNumber}`)
-
-                    const isLowStock = med?.medRepetitions
-                        ? med.medStock <= med.medStockConsumption
-                        : false
-
-                    return (
-                        <View key={slotNumber} style={styles.slotCard}>
-                            <View style={styles.slotIconContainer}>
-                            </View>
-
-                            <View style={styles.slotInfo}>
-                                <View style={styles.slotHeaderRow}>
-                                    <AppText style={styles.slotTitle}>Slot {slotNumber}</AppText>
-                                    {isLowStock && (
-                                        <View> 
-                                            <AppText style={styles.lowStockText}> Estoque Baixo! </AppText>
-                                        </View>
-                                    )}
-                                </View>
-
-                                <AppText>
-                                    Nome: {med ? med.medName : ''}
-                                </AppText>
-
-                                <AppText>
-                                   {`Horário: ${med ? med.medTime : ''}`}
-                                </AppText>
-
-                            </View>
-
-                            <TouchableOpacity style={styles.editButton}>
-                                <Feather name='edit-2' size={20} color='#00796b'/>
-                            </TouchableOpacity>
-                        </View>
-                    )
-                })}
+                <HomeSlots
+                    medications={medications}
+                />
+                
             </ScrollView>
         </View>
     )
@@ -216,54 +146,5 @@ const styles = StyleSheet.create({
         color: '#05534E',
         marginBottom: 15,
     },
-    slotCard: {
-        flexDirection: 'row',
-        backgroundColor: '#fff',
-        margin: 10,
-        borderRadius: 21,
-        padding: 15,
-        alignItems: 'center',
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    slotIconContainer: {
-        width: 50,
-        height: 50,
-        backgroundColor: '#DFDFDF',
-        margin: 20,
-        borderRadius: 10,
-    },
-    slotInfo: {
-        flex: 1,
-    },
-    slotHeaderRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 4,
-    },
-    slotTitle: {
-        color: '#198982'
-    },
-    slotText: {
-        fontSize: 16,
-        color: '#05534E'
-    },
-    lowStockBadge: {
-        backgroundColor: '#F98295',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 10,
-    },
-    lowStockText: {
-        color: '#fff',
-        fontSize: 10,
-    },
-    editButton: {
-        padding: 5,
-    }
+    
 }) 

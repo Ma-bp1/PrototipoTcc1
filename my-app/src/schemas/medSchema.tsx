@@ -31,3 +31,4 @@ export const medSchema = z.object({
 })
 
 export type MedData = z.infer<typeof medSchema>
+export type Medication = MedData & { id: string }

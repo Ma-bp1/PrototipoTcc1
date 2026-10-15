@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Alert} from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Alert, ActivityIndicator} from 'react-native'
 import { Input } from '../../../components/Input'
 import { AppText } from '../../../components/AppText'
 import TimePicker from '../../../components/TimePicker'
@@ -8,11 +8,11 @@ import { Button } from '../../../components/Button'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { medSchema, type MedData } from '../../../schemas/medSchema'
-import { useState } from 'react'
-import { useRouter } from 'expo-router'
+import { useState, useEffect } from 'react'
+import { useRouter, Stack, useLocalSearchParams } from 'expo-router'
 
 import {db, auth} from '../../../config/firebaseConfig'
-import {collection, addDoc} from 'firebase/firestore'
+import {collection, addDoc, getDoc, updateDoc, doc} from 'firebase/firestore'
 
 const DAYS = [
   { label: 'D', value: 0 },
@@ -27,9 +27,12 @@ const DAYS = [
 
 export default function AddMed(){
     const router = useRouter();
+    const { medicineId } = useLocalSearchParams<{ medicineId?: string }>();
+    const isEditing = !!medicineId;
     const [isLoading, setIsLoading] = useState(false)
+    const [isFetching, setIsFetching] = useState(isEditing);
 
-    const {control, handleSubmit, watch, setValue, formState: {errors}} = useForm<MedData>({
+    const {control, handleSubmit, watch, setValue, reset, formState: {errors}} = useForm<MedData>({
         resolver: zodResolver(medSchema),
         defaultValues: {
             medName: '', 
@@ -44,6 +47,35 @@ export default function AddMed(){
         }   
     })
 
+    
+    useEffect(() => {
+        if (!isEditing) return;
+
+        (async () => {
+            try {
+                const userId = auth.currentUser?.uid;
+                if (!userId) return;
+
+                const ref = doc(db, 'users', userId, 'medications', medicineId!);
+                const snap = await getDoc(ref);
+
+                if (!snap.exists()) {
+                    Alert.alert('Medicamento não encontrado.');
+                    router.back();
+                    return;
+                }
+
+                const { createdAt, updatedAt, ...formData } = snap.data();
+                reset(formData as MedData); // preenche todos os campos do form
+            } catch (error) {
+                console.error(error);
+                Alert.alert('Não foi possível carregar o medicamento.');
+            } finally {
+                setIsFetching(false);
+            }
+        })();
+    }, [medicineId]);
+
     const currentRepetition = watch('medRepetitions')
 
     const onSubmit = async (data: MedData) => {
@@ -57,15 +89,25 @@ export default function AddMed(){
                 return
             }
 
-            const userMedsCollection = collection(db, 'users', userId, 'medications')
+            if (isEditing) {
+                const { medSlot, ...editableData } = data;
 
-            await addDoc(userMedsCollection, {
-                ...data,
-                createdAt: new Date()
-            })
+                await updateDoc(doc(db, 'users', userId, 'medications', medicineId!), {
+                    ...editableData,
+                    updatedAt: new Date(),
+                });
 
-            Alert.alert('Medicamento cadastrado com sucesso.')
-            router.push('/home') 
+                Alert.alert('Medicamento atualizado com sucesso.');
+                router.back();
+            } else {
+                await addDoc(collection(db, 'users', userId, 'medications'), {
+                    ...data,
+                    createdAt: new Date(),
+                });
+
+                Alert.alert('Medicamento cadastrado com sucesso.');
+                router.push('/home');
+            }
         } catch (error) {
             console.error('Erro ao salvar medicamento no Firestore:', error)
             Alert.alert('Não foi possível salvar o medicamento.')
@@ -74,234 +116,243 @@ export default function AddMed(){
         }
     }
 
+    if (isFetching) return <ActivityIndicator />;
+
     return (
-        <View style = {styles.container}>
-            <ScrollView
-                keyboardShouldPersistTaps='handled'
-                nestedScrollEnabled={true}
-                showsVerticalScrollIndicator={false}
-            >
+        <>
+            <Stack.Screen
+                options={{ title: isEditing ? 'Editar Medicamento' : 'Adicionar Medicamento' }}
+            />
+            <View style = {styles.container}>
+                <ScrollView
+                    keyboardShouldPersistTaps='handled'
+                    nestedScrollEnabled={true}
+                    showsVerticalScrollIndicator={false}
+                >
 
-                <View style={{flex: 1, alignItems: 'center', justifyContent: 'center', margin: 30}}>
-                    <AppText style={{margin: 10,}}>
-                        Registrar Horário
-                    </AppText>
-                    <Controller
-                        control={control}
-                        name="medTime"
-                        render={({ field: { value, onChange } }) => {
-                            
-                            const [currentHour, currentMinute] = (value || '16:01').split(':').map(Number);
+                    <View style={{flex: 1, alignItems: 'center', justifyContent: 'center', margin: 30}}>
+                        <AppText style={{margin: 10,}}>
+                            Registrar Horário
+                        </AppText>
+                        <Controller
+                            control={control}
+                            name="medTime"
+                            render={({ field: { value, onChange } }) => {
+                                
+                                const [currentHour, currentMinute] = (value || '16:01').split(':').map(Number);
 
-                            return (
-                                <TimePicker
-                                    selectedHour={currentHour}
-                                    selectedMinute={currentMinute}
-                                    onTimeChange={(hour, minute) => {
-                                        const formattedTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-                                        onChange(formattedTime); // Atualiza o valor no useForm
-                                    }}
-                                />
-                            );
-                        }}
-                    />
-                    {errors.medTime && <AppText style={{ color: 'red' }}>{errors.medTime.message}</AppText>}
-                </View>
-                
-
-                <AppText style={{textAlign: 'center'}}>Repetições</AppText>
-                <View style={styles.row}>
-                    <AppText>A cada X horas</AppText>
-                    <Switch
-                        value={currentRepetition.type === 'horario'}
-                        onValueChange={(isEnabled) => {
-                            if (isEnabled) {
-                                setValue('medRepetitions', { type: 'horario', intervalHours: 8 });
-                            } else {
-                                setValue('medRepetitions', { type: 'diario' });
-                            }
-                        }}
-                    />
-                </View>
-
-                {currentRepetition.type === 'horario' && (
-                    <Controller
-                        control={control}
-                        name="medRepetitions"
-                        render={() => (
-                            <View style={[styles.subContainer, {}]}>
-                                <AppText>Intervalo em horas:</AppText>
-                                <Input
-                                    
-                                    keyboardType="numeric"
-                                    placeholder="8"
-                                    onChangeText={(text) => {
-                                        const num = Number(text);
-                                        setValue('medRepetitions', { type: 'horario', intervalHours: isNaN(num) ? 0 : num });
-                                    }}
-                                    value={String((currentRepetition as any).intervalHours || '')}
-                                />
-                            </View>
-                        )}
-                    />
-                )}
-
-                <View style={styles.row}>
-                    <AppText>Semanalmente?</AppText>
-                    <Switch
-                        value={currentRepetition.type === 'semanal'}
-                        onValueChange={(isEnabled) => {
-                            if (isEnabled) {
-                                setValue('medRepetitions', { type: 'semanal', daysOfWeek: [3] }); // Ex: Quarta-feira por padrão
-                            } else {
-                                setValue('medRepetitions', { type: 'diario' });
-                            }
-                        }}
-                    />
-                </View>
-
-                {currentRepetition.type === 'semanal' && (
-                    <View style={styles.daysContainer}>
-                        {DAYS.map((day) => {
-                            const selectedDays = (currentRepetition as any).daysOfWeek || [];
-                            const isSelected = selectedDays.includes(day.value);
-
-                            return (
-                                <TouchableOpacity
-                                    key={day.value}
-                                    style={[styles.dayButton, isSelected && styles.dayButtonSelected]}
-                                    onPress={() => {
-                                        let updatedDays = [...selectedDays];
-                                        if (isSelected) {
-                                            updatedDays = updatedDays.filter((d: number) => d !== day.value);
-                                        } else {
-                                            updatedDays.push(day.value);
-                                        }
-                                        setValue('medRepetitions', { type: 'semanal', daysOfWeek: updatedDays });
-                                    }}
-                                >
-                                    <AppText style={[styles.dayText, isSelected && styles.dayTextSelected]}>
-                                        {day.label}
-                                    </AppText>
-                                </TouchableOpacity>
-                            );
-                        })}
+                                return (
+                                    <TimePicker
+                                        selectedHour={currentHour}
+                                        selectedMinute={currentMinute}
+                                        onTimeChange={(hour, minute) => {
+                                            const formattedTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+                                            onChange(formattedTime); // Atualiza o valor no useForm
+                                        }}
+                                    />
+                                );
+                            }}
+                        />
+                        {errors.medTime && <AppText style={{ color: 'red' }}>{errors.medTime.message}</AppText>}
                     </View>
-                )}
-                {errors.medRepetitions && <AppText style={{ color: 'red' }}>Erro nas repetições</AppText>}
+                    
 
-                <View style={{flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 10, marginBottom: 10}}>
-                    <AppText style={{textAlign: 'left', width: '100%'}}>Nome do medicamento</AppText>
+                    <AppText style={{textAlign: 'center'}}>Repetições</AppText>
+                    <View style={styles.row}>
+                        <AppText>A cada X horas</AppText>
+                        <Switch
+                            value={currentRepetition.type === 'horario'}
+                            onValueChange={(isEnabled) => {
+                                if (isEnabled) {
+                                    setValue('medRepetitions', { type: 'horario', intervalHours: 8 });
+                                } else {
+                                    setValue('medRepetitions', { type: 'diario' });
+                                }
+                            }}
+                        />
+                    </View>
+
+                    {currentRepetition.type === 'horario' && (
+                        <Controller
+                            control={control}
+                            name="medRepetitions"
+                            render={() => (
+                                <View style={[styles.subContainer, {}]}>
+                                    <AppText>Intervalo em horas:</AppText>
+                                    <Input
+                                        
+                                        keyboardType="numeric"
+                                        placeholder="8"
+                                        onChangeText={(text) => {
+                                            const num = Number(text);
+                                            setValue('medRepetitions', { type: 'horario', intervalHours: isNaN(num) ? 0 : num });
+                                        }}
+                                        value={String((currentRepetition as any).intervalHours || '')}
+                                    />
+                                </View>
+                            )}
+                        />
+                    )}
+
+                    <View style={styles.row}>
+                        <AppText>Semanalmente?</AppText>
+                        <Switch
+                            value={currentRepetition.type === 'semanal'}
+                            onValueChange={(isEnabled) => {
+                                if (isEnabled) {
+                                    setValue('medRepetitions', { type: 'semanal', daysOfWeek: [3] }); // Ex: Quarta-feira por padrão
+                                } else {
+                                    setValue('medRepetitions', { type: 'diario' });
+                                }
+                            }}
+                        />
+                    </View>
+
+                    {currentRepetition.type === 'semanal' && (
+                        <View style={styles.daysContainer}>
+                            {DAYS.map((day) => {
+                                const selectedDays = (currentRepetition as any).daysOfWeek || [];
+                                const isSelected = selectedDays.includes(day.value);
+
+                                return (
+                                    <TouchableOpacity
+                                        key={day.value}
+                                        style={[styles.dayButton, isSelected && styles.dayButtonSelected]}
+                                        onPress={() => {
+                                            let updatedDays = [...selectedDays];
+                                            if (isSelected) {
+                                                updatedDays = updatedDays.filter((d: number) => d !== day.value);
+                                            } else {
+                                                updatedDays.push(day.value);
+                                            }
+                                            setValue('medRepetitions', { type: 'semanal', daysOfWeek: updatedDays });
+                                        }}
+                                    >
+                                        <AppText style={[styles.dayText, isSelected && styles.dayTextSelected]}>
+                                            {day.label}
+                                        </AppText>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    )}
+                    {errors.medRepetitions && <AppText style={{ color: 'red' }}>Erro nas repetições</AppText>}
+
+                    <View style={{flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 10, marginBottom: 10}}>
+                        <AppText style={{textAlign: 'left', width: '100%'}}>Nome do medicamento</AppText>
+                        <Controller
+                            control={control}
+                            name='medName'
+                            render= {({field: {onChange, onBlur, value} }) => (
+                                <Input 
+                                    placeholder=''
+                                    onBlur={onBlur}
+                                    onChangeText={onChange}
+                                    value={value}
+                                    style={{backgroundColor:'#DEE6E6', borderColor: '#198982', borderWidth: 2, margin: '5%', height: 70}}
+                                />
+                            )}
+                        />
+                        {errors.medName && <AppText>{errors.medName.message}</AppText>}
+                    </View>
+                    
+
+                    <AppText>Slot:</AppText>
                     <Controller
                         control={control}
-                        name='medName'
-                        render= {({field: {onChange, onBlur, value} }) => (
-                            <Input 
-                                placeholder=''
-                                onBlur={onBlur}
-                                onChangeText={onChange}
-                                value={value}
-                                style={{backgroundColor:'#DEE6E6', borderColor: '#198982', borderWidth: 2, margin: '5%', height: 70}}
+                        name="medSlot" 
+                        render={({ field: { value, onChange } }) => (
+                            <CustomDropdown
+                                label="Slot"
+                                options={[
+                                    { label: 'Slot 1', value: 'slot_1' },
+                                    { label: 'Slot 2', value: 'slot_2' },
+                                    { label: 'Slot 3', value: 'slot_3' },
+                                    { label: 'Slot 4', value: 'slot_4' },
+                                    { label: 'Slot 5', value: 'slot_5' },
+                                    { label: 'Slot 6', value: 'slot_6' },
+                                ]}
+                                selectedValue={value}
+                                onSelect={onChange}
+                                disabled={isEditing}
                             />
                         )}
                     />
-                    {errors.medName && <AppText>{errors.medName.message}</AppText>}
-                </View>
-                
 
-                <AppText>Slot:</AppText>
-                <Controller
-                    control={control}
-                    name="medSlot" // Certifique-se de adicionar no schema Zod
-                    render={({ field: { value, onChange } }) => (
-                        <CustomDropdown
-                            label="Slot"
-                            options={[
-                                { label: 'Slot 1', value: 'slot_1' },
-                                { label: 'Slot 2', value: 'slot_2' },
-                                { label: 'Slot 3', value: 'slot_3' },
-                                { label: 'Slot 4', value: 'slot_4' },
-                                { label: 'Slot 5', value: 'slot_5' },
-                                { label: 'Slot 6', value: 'slot_6' },
-                            ]}
-                            selectedValue={value}
-                            onSelect={onChange}
-                        />
-                    )}
-                />
-
-                <AppText>Via de Administração:</AppText>
-                <Controller
-                    control={control}
-                    name="medAdminRoute" // Certifique-se de adicionar no schema Zod
-                    render={({ field: { value, onChange } }) => (
-                        <CustomDropdown
-                            label="Slot"
-                            options={[
-                                {label: 'Oral', value: 'oral'},
-                                {label: 'Sublingual', value: 'subl'},
-                                {label: 'Venosa', value: 'veno'},
-                            ]}
-                            selectedValue={value}
-                            onSelect={onChange}
-                        />
-                    )}
-                />
-
-                <AppText>Quantidade a Ser Colocada no Slot:</AppText>
-                <Controller
-                    control={control}
-                    name="medStock" 
-                    render={({ field: { value, onChange } }) => (
-                        <NumberStepper
-                            value={value}
-                            onChange={onChange}
-                            min={0}
-                        />
-                    )}
-                />
-
-                <AppText>Quantidade de medicamentos a serem consumidos por dose:</AppText>
-                <Controller
-                    control={control}
-                    name="medStockConsumption" 
-                    render={({ field: { value, onChange } }) => (
-                        <NumberStepper
-                            value={value}
-                            onChange={onChange}
-                            min={0}
-                        />
-                    )}
-                />
-
-                <View style={{flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 10, marginBottom: 10}}>
-                    <AppText style={{textAlign: 'left', width: '100%'}}>Descrição</AppText>
+                    <AppText>Via de Administração:</AppText>
                     <Controller
                         control={control}
-                        name='medDesc'
-                        render= {({field: {onChange, onBlur, value} }) => (
-                            <Input 
-                                placeholder=''
-                                onBlur={onBlur}
-                                onChangeText={onChange}
-                                value={value}
-                                style={{backgroundColor:'#DEE6E6', borderColor: '#198982', borderWidth: 2, margin: '5%', height: 70}}
+                        name="medAdminRoute" 
+                        render={({ field: { value, onChange } }) => (
+                            <CustomDropdown
+                                label="Slot"
+                                options={[
+                                    {label: 'Oral', value: 'oral'},
+                                    {label: 'Sublingual', value: 'subl'},
+                                    {label: 'Venosa', value: 'veno'},
+                                ]}
+                                selectedValue={value}
+                                onSelect={onChange}
                             />
                         )}
                     />
-                    {errors.medName && <AppText>{errors.medName.message}</AppText>}
-                </View>
 
-                <Button 
-                    style={{marginBottom: 130}} 
-                    variant='blue' 
-                    label={isLoading ? 'Salvando...' : 'Salvar Medicamento'}
-                    onPress={handleSubmit(onSubmit, (errors) =>{
-                        console.log('Validation Errors:', errors)
-                    })}
-                />
-            </ScrollView>
-        </View>
+                    <AppText>Quantidade a Ser Colocada no Slot:</AppText>
+                    <Controller
+                        control={control}
+                        name="medStock" 
+                        render={({ field: { value, onChange } }) => (
+                            <NumberStepper
+                                value={value}
+                                onChange={onChange}
+                                min={0}
+                            />
+                        )}
+                    />
+
+                    <AppText>Quantidade de medicamentos a serem consumidos por dose:</AppText>
+                    <Controller
+                        control={control}
+                        name="medStockConsumption" 
+                        render={({ field: { value, onChange } }) => (
+                            <NumberStepper
+                                value={value}
+                                onChange={onChange}
+                                min={0}
+                            />
+                        )}
+                    />
+
+                    <View style={{flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 10, marginBottom: 10}}>
+                        <AppText style={{textAlign: 'left', width: '100%'}}>Descrição</AppText>
+                        <Controller
+                            control={control}
+                            name='medDesc'
+                            render= {({field: {onChange, onBlur, value} }) => (
+                                <Input 
+                                    placeholder=''
+                                    onBlur={onBlur}
+                                    onChangeText={onChange}
+                                    value={value}
+                                    style={{backgroundColor:'#DEE6E6', borderColor: '#198982', borderWidth: 2, margin: '5%', height: 70}}
+                                />
+                            )}
+                        />
+                        {errors.medName && <AppText>{errors.medName.message}</AppText>}
+                    </View>
+
+                    <Button 
+                        style={{marginBottom: 130}} 
+                        variant='blue' 
+                        label={isLoading ? 'Salvando...' : 'Salvar Medicamento'}
+                        onPress={handleSubmit(onSubmit, (errors) =>{
+                            console.log('Validation Errors:', errors)
+                        })}
+                    />
+                </ScrollView>
+            </View>
+        </>
+        
     )
 }
 

@@ -30,7 +30,6 @@ export default function AppConfig(){
                 style={{flex: 1, width: '100%'}}
                 contentContainerStyle={styles.content}
             >
-                <Text>App Config Screen</Text>
                 <View style={styles.configBox}>
                     <ConfigItem
                         icon={<Feather name='lock' size={28} color='#31AEAE' />}

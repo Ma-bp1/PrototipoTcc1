@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 interface Option {
@@ -12,26 +12,47 @@ interface CustomDropdownProps {
   options: Option[];
   selectedValue: string | number;
   onSelect: (value: string | number) => void;
+  disabled?: boolean;
+  disabledMessage?: string;
 }
 
-export function CustomDropdown({ options, selectedValue, onSelect }: CustomDropdownProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function CustomDropdown({ 
+    options, 
+    selectedValue, 
+    onSelect,
+    disabled = false,
+    disabledMessage = 'Você não pode alterar o slot no modo edição.', 
+  }: CustomDropdownProps) {
+    const [isOpen, setIsOpen] = useState(false);
 
-  const selectedLabel = options.find((opt) => opt.value === selectedValue)?.label || 'Selecione';
+    const selectedLabel = options.find((opt) => opt.value === selectedValue)?.label || 'Selecione';
 
-  return (
-    /* Boost zIndex dynamically when open so it layers over elements underneath */
-    <View style={[styles.container, isOpen && styles.activeContainer]}>
-      <TouchableOpacity 
-        style={styles.button} 
-        onPress={() => setIsOpen(!isOpen)}
-        activeOpacity={0.8}
+    const handlePress = () => {
+      if (disabled) {
+        Alert.alert('Atenção', disabledMessage);
+        return;
+      }
+      setIsOpen(!isOpen);
+    };
+
+    return (
+      <View style={[styles.container, isOpen && styles.activeContainer]}>
+      <TouchableOpacity
+        style={[styles.button, disabled && styles.buttonDisabled]}
+        onPress={handlePress}
+        activeOpacity={disabled ? 1 : 0.8}
       >
-        <Text style={styles.buttonText}>{selectedLabel}</Text>
-        <Feather name={isOpen ? "chevron-up" : "chevron-down"} size={20} color="#198982" />
+        <Text style={[styles.buttonText, disabled && styles.textDisabled]}>
+          {selectedLabel}
+        </Text>
+        <Feather
+          name={isOpen ? 'chevron-up' : 'chevron-down'}
+          size={20}
+          color={disabled ? '#9E9E9E' : '#198982'}
+        />
       </TouchableOpacity>
 
-      {isOpen && (
+      {isOpen && !disabled && (
         <View style={styles.dropdownList}>
           {options.map((item) => (
             <TouchableOpacity
@@ -48,7 +69,7 @@ export function CustomDropdown({ options, selectedValue, onSelect }: CustomDropd
         </View>
       )}
     </View>
-  );
+    );
 }
 
 const styles = StyleSheet.create({
@@ -56,11 +77,11 @@ const styles = StyleSheet.create({
     width: '100%',
     marginVertical: 6,
     position: 'relative',
-    zIndex: 1, // Default low stacking order
+    zIndex: 1, 
   },
   activeContainer: {
-    zIndex: 1000, // Elevates the container over all other screen elements when open
-    elevation: 1000, // Android requirement for zIndex stacking
+    zIndex: 1000, 
+    elevation: 1000,
   },
   button: {
     flexDirection: 'row',
@@ -100,5 +121,12 @@ const styles = StyleSheet.create({
   optionText: {
     color: '#198982',
     fontSize: 16,
+  },
+  buttonDisabled: {
+    backgroundColor: '#E0E0E0',
+    borderColor: '#B0B0B0',
+  },
+  textDisabled: {
+    color: '#9E9E9E',
   },
 });

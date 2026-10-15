@@ -3,7 +3,7 @@ import { View, TouchableOpacity, TouchableOpacityProps, Text, StyleProp, StyleSh
 
 type ButtonProps = TouchableOpacityProps & {
     label: string,
-    variant?: 'red' | 'blue' | 'grey' | 'white' //ao invés de usar uma string genérica, o uso de 'vermelho' OU 'azul' faz com que este campo se autocomplete em futuras implementações do botão; exemplo: não pode haver uma variant 'green', pois não existe (somente aceito red ou blue).
+    variant?: 'red' | 'blue' | 'grey' | 'white' | 'blueGrey' //ao invés de usar uma string genérica, o uso de 'vermelho' OU 'azul' faz com que este campo se autocomplete em futuras implementações do botão; exemplo: não pode haver uma variant 'green', pois não existe (somente aceito red ou blue).
 }
 
 export function Button({label, style, variant = 'red', ...rest}: ButtonProps){
@@ -12,6 +12,7 @@ export function Button({label, style, variant = 'red', ...rest}: ButtonProps){
         red: styles.container,
         blue: styles.blue,
         grey: styles.grey,
+        blueGrey: styles.blueGrey,
         white: styles.white
     }
 
@@ -19,6 +20,7 @@ export function Button({label, style, variant = 'red', ...rest}: ButtonProps){
         red: styles.label,
         blue: styles.label,
         grey: styles.greyLabel,
+        blueGrey: styles.blueGreyLabel,
         white: styles.whiteLabel
     }
 
@@ -48,6 +50,10 @@ const styles = StyleSheet.create({
         color: '#8E8E93',
         fontSize: 16,
     },
+    blueGreyLabel: {
+        color: '#fff',
+        fontSize: 16,
+    },
     whiteLabel: {
         color: '#05534E',
         fontSize: 24
@@ -57,6 +63,10 @@ const styles = StyleSheet.create({
     },
     grey: {
         backgroundColor: '#F5F5F5',
+        
+    },
+    blueGrey: {
+        backgroundColor: '#31AEAE',
         
     },
     white: {

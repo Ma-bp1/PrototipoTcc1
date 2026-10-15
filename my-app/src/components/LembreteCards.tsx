@@ -10,16 +10,16 @@ const maxCards = 2
 const minutoMilisegundos = 60 * 1000
 const horaMilisegundos = 60 * minutoMilisegundos
 
-// O card só aparece quando faltar menos que isso
+
 const janelaMinutos = 30
 const janelaMilisegundos = janelaMinutos * minutoMilisegundos
 
-// Confirmar/Adiar só ficam disponíveis quando faltar menos que isso
+
 const janelaAcaoMinutos = 5
 const janelaAcaoMilisegundos = janelaAcaoMinutos * minutoMilisegundos
 
-// Quanto o "Adiar" empurra a dose
-const adiarMinutos = 10
+
+const adiarMinutos = 5
 const adiarMilisegundos = adiarMinutos * minutoMilisegundos
 
 const textoSemCadastro = 'Nenhum medicamento cadastrado.'
@@ -36,17 +36,13 @@ export interface MedicationBase {
     medTime: string
     medName?: string
     medRepetitions?: MedData['medRepetitions']
-    /** Horário (epoch ms) da última dose confirmada */
     medLastConfirmed?: number
-    /** Novo horário (epoch ms) quando a dose foi adiada */
     medSnoozedUntil?: number
 }
 
 interface LembreteCardsProps {
     medications: MedicationBase[]
-    /** doseMs = horário (epoch ms) da dose confirmada */
     onConfirmar?: (id: string, doseMs: number) => void
-    /** adiadaAteMs = novo horário (epoch ms) da dose adiada */
     onAdiar?: (id: string, adiadaAteMs: number) => void
 }
 
@@ -226,13 +222,13 @@ function LembreteCard({
                     >
                         <Button
                             label="Confirmar dose"
-                            variant="grey"
+                            variant={podeAgir ? 'blueGrey' : 'grey'}
                             style={styles.semMargem}
                             onPress={onConfirmar}
                         />
                         <Button
                             label="Adiar"
-                            variant="grey"
+                            variant={podeAgir ? 'blueGrey' : 'grey'}
                             style={styles.semMargem}
                             onPress={onAdiar}
                         />
