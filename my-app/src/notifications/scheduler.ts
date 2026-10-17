@@ -1,29 +1,29 @@
-import * as Notifications from 'expo-notifications';
+import { getNotifications } from './native';
 
-type Med = { id: string; name: string; times: string[] }; // times: ['08:00', '20:00']
+type Med = { id: string; name: string; times: string[] };
 
 export async function cancelMedication(medId: string) {
-  const all = await Notifications.getAllScheduledNotificationsAsync();
+  const N = getNotifications();
+  if (!N) return;
+  const all = await N.getAllScheduledNotificationsAsync();
   await Promise.all(
     all
       .filter((n) => n.identifier.startsWith(`${medId}-`))
-      .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier))
+      .map((n) => N.cancelScheduledNotificationAsync(n.identifier))
   );
 }
 
 export async function scheduleMedication(med: Med) {
-  await cancelMedication(med.id); // evita duplicar ao editar
+  const N = getNotifications();
+  if (!N) return;
+  await cancelMedication(med.id);
   for (const time of med.times) {
     const [hour, minute] = time.split(':').map(Number);
-    await Notifications.scheduleNotificationAsync({
+    await N.scheduleNotificationAsync({
       identifier: `${med.id}-${time}`,
-      content: {
-        title: 'Hora do remédio',
-        body: med.name,
-        data: { medId: med.id },
-      },
+      content: { title: 'Hora do remédio', body: med.name, data: { medId: med.id } },
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        type: N.SchedulableTriggerInputTypes.DAILY,
         hour,
         minute,
         channelId: 'doses',

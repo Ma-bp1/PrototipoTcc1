@@ -13,7 +13,7 @@ import { useRouter, Stack, useLocalSearchParams } from 'expo-router'
 
 import {db, auth} from '../../../config/firebaseConfig'
 import {collection, addDoc, getDoc, updateDoc, doc} from 'firebase/firestore'
-import { scheduleMedication } from '@/src/notifications/scheduler'
+import { scheduleMedication } from '../../../../src/notifications/scheduler'
 
 const DAYS = [
   { label: 'D', value: 0 },

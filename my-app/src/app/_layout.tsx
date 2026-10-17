@@ -1,26 +1,29 @@
 import { Stack, router } from 'expo-router';
-import { useEffect } from 'react'
-import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import * as Notifications from 'expo-notifications';
-import { setupNotifications } from '../../src/notifications/setup';
+import { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { setupNotifications } from '../notifications/setup';
+import { getNotifications } from '../notifications/native';
 
 const semHeader = ['index', 'welcome', 'login', 'signUp', 'home'];
 
 export default function Layout() {
     useEffect(() => {
-    setupNotifications().catch(console.warn);
+        const N = getNotifications();
+        if (!N) return; // build sem o módulo: o app abre normalmente
 
-        const open = (n: Notifications.Notification) =>
-        router.push({
-            pathname: '/doseAlert',
-            params: { medId: String(n.request.content.data?.medId ?? '') },
-        });
+        setupNotifications().catch(console.warn);
+
+        const open = (n: any) =>
+            router.push({
+                pathname: '/doseAlert',
+                params: { medId: String(n.request.content.data?.medId ?? '') },
+            });
 
         // app aberto: abre o alerta na hora
-        const s1 = Notifications.addNotificationReceivedListener(open);
+        const s1 = N.addNotificationReceivedListener(open);
         // usuário tocou na notificação
-        const s2 = Notifications.addNotificationResponseReceivedListener((r) =>
-        open(r.notification)
+        const s2 = N.addNotificationResponseReceivedListener((r: any) =>
+            open(r.notification)
         );
         return () => { s1.remove(); s2.remove(); };
     }, []);
@@ -33,7 +36,12 @@ export default function Layout() {
                         (nome) => route.name === nome || route.name.startsWith(`${nome}/`)
                     ),
                 })}
-            />
+            >
+                <Stack.Screen
+                    name="doseAlert"
+                    options={{ presentation: 'fullScreenModal', headerShown: false }}
+                />
+            </Stack>
         </GestureHandlerRootView>
     );
 }

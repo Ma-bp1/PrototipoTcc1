@@ -1,23 +1,26 @@
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+import { getNotifications } from './native';
 
 export async function setupNotifications() {
+  const N = getNotifications();
+  if (!N) return false;
+
+  N.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('doses', {
+    await N.setNotificationChannelAsync('doses', {
       name: 'Lembretes de remédio',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 500, 300, 500], // vibração
+      importance: N.AndroidImportance.MAX,
+      vibrationPattern: [0, 500, 300, 500],
     });
   }
-  const { status } = await Notifications.requestPermissionsAsync();
+  const { status } = await N.requestPermissionsAsync();
   return status === 'granted';
 }
