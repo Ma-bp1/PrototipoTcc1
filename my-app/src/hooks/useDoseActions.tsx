@@ -11,27 +11,23 @@ import {
 
 import { auth, db } from '../config/firebaseConfig'
 import { MedData } from '../schemas/medSchema'
+import { confirmDoseInDb, snoozeDoseInDb } from '../services/doseService';
+import { cancelSnooze, snoozeMedication } from '../services/medicationScheduler';
 
 type Medication = MedData & { id: string }
+const SNOOZE_MINUTES = 5
 
 export function useDoseActions(
     medications: Medication[],
     setMedications: Dispatch<SetStateAction<Medication[]>>,
 ) {
     const emAndamento = useRef(new Set<string>())
-
-    const getMedRef = (medId: string) => {
-        const userId = auth.currentUser?.uid
-        if (!userId) throw new Error('Usuário não autenticado')
-
-        return doc(db, 'users', userId, 'medications', medId)
-    }
-
+ 
     const atualizarLocal = (medId: string, campos: Partial<Medication>) =>
         setMedications((prev) =>
             prev.map((m) => (m.id === medId ? { ...m, ...campos } : m)),
         )
-
+ 
     const executar = async (
         medId: string,
         mensagemErro: string,
@@ -39,7 +35,7 @@ export function useDoseActions(
     ) => {
         if (emAndamento.current.has(medId)) return
         emAndamento.current.add(medId)
-
+ 
         try {
             await acao()
         } catch (error) {
@@ -49,41 +45,34 @@ export function useDoseActions(
             emAndamento.current.delete(medId)
         }
     }
-
-    
+ 
     const confirmarDose = (medId: string, doseMs: number) =>
         executar(medId, 'Não foi possível confirmar a dose.', async () => {
             const med = medications.find((m) => m.id === medId)
             if (!med) return
-
-            const novoEstoque = Math.max(0, med.medStock - med.medStockConsumption)
-            const medRef = getMedRef(medId)
-
-            
-            const batch = writeBatch(db)
-            batch.update(medRef, {
-                medStock: novoEstoque,
-                medLastConfirmed: doseMs,
-                medSnoozedUntil: deleteField(),
-            })
-            batch.set(doc(collection(medRef, 'doseLogs')), {
-                scheduledFor: doseMs,
-                confirmedAt: serverTimestamp(),
-            })
-            await batch.commit()
-
-            atualizarLocal(medId, {
-                medStock: novoEstoque,
-                medLastConfirmed: doseMs,
-                medSnoozedUntil: undefined,
-            })
+ 
+            const novos = await confirmDoseInDb(medId, med, doseMs)
+            await cancelSnooze(medId) // evita o aviso adiado tocar depois de confirmar
+ 
+            atualizarLocal(medId, { ...novos, medSnoozedUntil: undefined })
         })
-
-    const adiarDose = (medId: string, adiadaAteMs: number) =>
+ 
+    // Agora também agenda o aviso. Assinatura mudou: recebe doseMs e minutos (em vez de adiadaAteMs).
+    const adiarDose = (medId: string, doseMs: number, minutos = SNOOZE_MINUTES) =>
         executar(medId, 'Não foi possível adiar a dose.', async () => {
-            await updateDoc(getMedRef(medId), { medSnoozedUntil: adiadaAteMs })
+            const med = medications.find((m) => m.id === medId)
+            if (!med) return
+ 
+            const adiadaAteMs = await snoozeMedication({
+                id: medId,
+                name: med.medName,
+                doseMs,
+                minutes: minutos,
+            })
+            await snoozeDoseInDb(medId, adiadaAteMs)
+ 
             atualizarLocal(medId, { medSnoozedUntil: adiadaAteMs })
         })
-
+ 
     return { confirmarDose, adiarDose }
 }

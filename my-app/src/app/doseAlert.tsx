@@ -6,10 +6,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { doc, getDoc } from 'firebase/firestore';
 
 // TODO: ajuste os caminhos para os do seu projeto
-import { auth, db } from '../../src/config/firebaseConfig';
-import { snoozeMedication, cancelSnooze } from '../../src/notifications/';
-import { confirmDoseInDb, snoozeDoseInDb } from '../../src/services/doseService';
-import type { MedData } from '@/schemas/medSchema';
+import { auth, db } from '../config/firebaseConfig'
+import { snoozeMedication, cancelSnooze } from '../services/medicationScheduler'
+import { confirmDoseInDb, snoozeDoseInDb } from '../services/doseService'
+import type { MedData } from '../schemas/medSchema';
 
 const SNOOZE_MINUTES = 5;
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
