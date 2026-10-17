@@ -28,8 +28,17 @@ const DAYS = [
 function getTimes(data: MedData): string[] {
     const match = /^(\d{1,2}):(\d{2})$/.exec(data.medTime ?? '');
     if (!match) return [];
-    const hh = match[1].padStart(2, '0');
-    return [`${hh}:${match[2]}`];
+    const start = Number(match[1]);
+    const mm = match[2];
+
+    const rep = data.medRepetitions;
+    const step = rep.type === 'horario' ? rep.intervalHours : 24;
+
+    const times: string[] = [];
+    for (let h = start; h < start + 24; h += step) {
+        times.push(`${String(h % 24).padStart(2, '0')}:${mm}`);
+    }
+    return times;
 }
 
 
@@ -109,7 +118,7 @@ export default function AddMed(){
             }
 
             if (isEditing) {
-                const { medSlot, ...editableData } = data;
+                const { medSlot, medLastConfirmed, medSnoozedUntil, ...editableData } = data;
 
                 await updateDoc(doc(db, 'users', userId, 'medications', medicineId!), {
                     ...editableData,
