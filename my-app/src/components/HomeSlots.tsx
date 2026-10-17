@@ -14,6 +14,7 @@ import { Feather } from '@expo/vector-icons'
 import { Medication } from '../schemas/medSchema'
 import { AppText } from './AppText'
 import { router } from 'expo-router'
+import { cancelMedication } from '../notifications/scheduler'
 
 type HomeSlotsProps = {
     medications: Medication[]
@@ -73,6 +74,12 @@ export function HomeSlots({ medications }: HomeSlotsProps) {
                             }
 
                             await deleteDoc(doc(db, 'users', userId, 'medications', med.id))
+
+                            try {
+                                await cancelMedication(med.id)
+                            } catch (e) {
+                                console.warn('Falha ao cancelar notificações', e)
+                            }
                         } catch (error) {
                             Alert.alert('Erro', 'Não foi possível excluir o medicamento.')
                             swipeRefs.current[slotNumber]?.close()
