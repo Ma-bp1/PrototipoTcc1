@@ -1,14 +1,24 @@
-import { View, Text, StyleSheet, ScrollView, Switch } from 'react-native'
-import { useState } from 'react'
+import { View, Text, StyleSheet, ScrollView, Switch, Alert, ActivityIndicator } from 'react-native'
+import { useEffect, useState } from 'react'
 import { AppText } from '../../../../components/AppText'
+
+// TODO: ajuste os caminhos conforme onde você salvou os arquivos
+import {
+    AlertSettings,
+    getAlertSettings,
+    saveAlertSettings,
+} from '../../../../services/alertSettings'
+import { cancelAllMedicationAlerts } from '../../../../notifications/scheduler'
+import { rescheduleAllMedications } from '../../../../services/rescheduleAll'
 
 type SwitchRowProps = {
     label: string
     value: boolean
     onChange: () => void
+    disabled?: boolean
 }
 
-function SwitchRow({ label, value, onChange }: SwitchRowProps) {
+function SwitchRow({ label, value, onChange, disabled }: SwitchRowProps) {
     return (
         <View style={styles.boxItem}>
             <View style={{ flex: 1 }}>
@@ -17,6 +27,7 @@ function SwitchRow({ label, value, onChange }: SwitchRowProps) {
             <Switch
                 value={value}
                 onValueChange={onChange}
+                disabled={disabled}
                 trackColor={{ false: '#FF6B8A', true: '#31AEAE' }}
                 thumbColor='#fff'
             />
@@ -25,18 +36,45 @@ function SwitchRow({ label, value, onChange }: SwitchRowProps) {
 }
 
 export default function AlertConfig() {
-    const [settings, setSettings] = useState({
-        medAlert: true,
-        lowStock: true,
-        timeConflict: true,
-        slotConflict: true,
-        vibration: false,
-        sound: true,
-        light: true,
-    })
+    const [settings, setSettings] = useState<AlertSettings | null>(null)
+    const [syncing, setSyncing] = useState(false)
 
-    const toggle = (key: keyof typeof settings) => {
-        setSettings(prev => ({ ...prev, [key]: !prev[key] }))
+    useEffect(() => {
+        getAlertSettings().then(setSettings)
+    }, [])
+
+    const toggle = async (key: keyof AlertSettings) => {
+        if (!settings || syncing) return
+
+        const previous = settings
+        const next = { ...settings, [key]: !settings[key] }
+        setSettings(next)
+        setSyncing(true)
+
+        try {
+            // salva primeiro: o agendador lê esta configuração
+            await saveAlertSettings(next)
+
+            if (key === 'medAlert') {
+                if (next.medAlert) await rescheduleAllMedications()
+                else await cancelAllMedicationAlerts()
+            }
+        } catch (error) {
+            console.error('Erro ao aplicar configuração de alerta', error)
+            setSettings(previous)
+            await saveAlertSettings(previous).catch(() => {})
+            Alert.alert('Não foi possível salvar a configuração.', 'Tente novamente.')
+        } finally {
+            setSyncing(false)
+        }
+    }
+
+    if (!settings) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center' }]}>
+                <ActivityIndicator color='#31AEAE' />
+            </View>
+        )
     }
 
     return (
@@ -53,26 +91,32 @@ export default function AlertConfig() {
                         label='Notificações para alerta dos medicamentos'
                         value={settings.medAlert}
                         onChange={() => toggle('medAlert')}
+                        disabled={syncing}
                     />
+                    {/* Baixo estoque: salvo, mas sem efeito até a lógica de estoque existir */}
                     <SwitchRow
                         label='Baixo Estoque'
                         value={settings.lowStock}
                         onChange={() => toggle('lowStock')}
+                        disabled={syncing}
                     />
                     <SwitchRow
                         label='Conflito de Horário'
                         value={settings.timeConflict}
                         onChange={() => toggle('timeConflict')}
+                        disabled={syncing}
                     />
                     <SwitchRow
                         label='Conflito de Slot'
                         value={settings.slotConflict}
                         onChange={() => toggle('slotConflict')}
+                        disabled={syncing}
                     />
                     <SwitchRow
                         label='Vibração'
                         value={settings.vibration}
                         onChange={() => toggle('vibration')}
+                        disabled={syncing}
                     />
                 </View>
 
@@ -82,11 +126,13 @@ export default function AlertConfig() {
                         label='Alerta Sonoro'
                         value={settings.sound}
                         onChange={() => toggle('sound')}
+                        disabled={syncing}
                     />
                     <SwitchRow
                         label='Alerta Luminoso'
                         value={settings.light}
                         onChange={() => toggle('light')}
+                        disabled={syncing}
                     />
                 </View>
             </ScrollView>

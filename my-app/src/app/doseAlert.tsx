@@ -5,10 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { doc, getDoc } from 'firebase/firestore';
 
-// TODO: ajuste os caminhos para os do seu projeto
-import { auth, db } from '../config/firebaseConfig'
-import { snoozeMedication, cancelSnooze } from '../services/medicationScheduler'
-import { confirmDoseInDb, snoozeDoseInDb } from '../services/doseService'
+import { auth, db } from '../config/firebaseConfig';
+import { snoozeMedication, cancelSnooze } from '../notifications/scheduler';
+import { getAlertSettings } from '../services/alertSettings';
+import { confirmDoseInDb, snoozeDoseInDb } from '../services/doseService';
 import type { MedData } from '../schemas/medSchema';
 
 const SNOOZE_MINUTES = 5;
@@ -84,8 +84,14 @@ export default function DoseAlert() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    Vibration.vibrate([0, 500, 300, 500], true); // repete até sair
-    return () => Vibration.cancel();
+    let active = true;
+    getAlertSettings().then(({ vibration }) => {
+      if (active && vibration) Vibration.vibrate([0, 500, 300, 500], true); // repete até sair
+    });
+    return () => {
+      active = false;
+      Vibration.cancel();
+    };
   }, []);
 
   useEffect(() => {

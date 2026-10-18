@@ -15,6 +15,9 @@ import {db, auth} from '../../../config/firebaseConfig'
 import {collection, addDoc, getDoc, updateDoc, doc} from 'firebase/firestore'
 import { scheduleMedication } from '../../../../src/notifications/scheduler'
 
+import { getAlertSettings } from '../../../services/alertSettings'
+import { loadMedications, findConflicts, confirmConflicts } from '../../../services/conflicts'
+
 const DAYS = [
   { label: 'D', value: 0 },
   { label: 'S', value: 1 },
@@ -68,8 +71,9 @@ export default function AddMed(){
         try {
             await scheduleMedication({
                 id,
-                name: data.medName,          
+                name: data.medName,
                 times: getTimes(data),
+                repetition: data.medRepetitions,
             });
         } catch (e) {
             console.warn('Falha ao agendar notificações', e);
@@ -110,11 +114,19 @@ export default function AddMed(){
         setIsLoading(true)
         try {
             const userId = auth.currentUser?.uid
+            const settings = await getAlertSettings()
+            const checkSlot = settings.slotConflict && !isEditing
 
             if (!userId) {
                 Alert.alert('Erro, usuário não está logado')
                 setIsLoading(false)
                 return
+            }
+
+            if (settings.timeConflict || checkSlot) {
+                const others = (await loadMedications(userId)).filter(m => m.id !== medicineId)
+                const conflicts = findConflicts(data, others, { time: settings.timeConflict, slot: checkSlot })
+                if (conflicts.length && !(await confirmConflicts(conflicts))) return
             }
 
             if (isEditing) {

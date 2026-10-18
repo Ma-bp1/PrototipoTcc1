@@ -1,4 +1,4 @@
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs, useRouter, Href } from 'expo-router';
 import { View, Pressable, StyleSheet, Text } from 'react-native';
 import { CustomTabButton } from '../../components/CustomTabButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,13 +6,16 @@ import Feather from '@expo/vector-icons/Feather';
 
 const corHeader = '#31AEAE'
 
-function BackButton() {
+// `to`: destino fixo (ex.: alertas -> configurações). Sem `to`, volta no histórico.
+function BackButton({ to }: { to?: Href }) {
     const router = useRouter()
 
     return (
         <Pressable
             onPress={() => {
-                if (router.canGoBack()) {
+                if (to) {
+                    router.navigate(to);
+                } else if (router.canGoBack()) {
                     router.back();
                 } else {
                     router.replace('/home');
@@ -36,6 +39,8 @@ function CustomTabBar({state, navigation}: { state: any; navigation: any }) {
 
     const currentRoute = state.routes[state.index].name;
     const isHome = currentRoute === 'index';
+    // a engrenagem fica ativa também nas telas filhas de appConfig
+    const isConfig = currentRoute.startsWith('appConfig/');
 
     return (
         <View style={[styles.container, 
@@ -46,7 +51,7 @@ function CustomTabBar({state, navigation}: { state: any; navigation: any }) {
         ]}>
             <CustomTabButton
                 icon='settings'
-                isFocused={currentRoute === 'appConfig/index'}
+                isFocused={isConfig}
                 onPress={()=> navigation.navigate('appConfig/index')}
             />
             <CustomTabButton
@@ -121,8 +126,14 @@ export default function TabsLayout() {
             <Tabs.Screen name='profile/index' options={{ title: 'Perfil' }}/>
             <Tabs.Screen name='boxConfig/index' options={{ title: 'Configurações da Caixa' }}/>
             <Tabs.Screen name='appConfig/index' options={{ title: 'Configurações' }} />
+            <Tabs.Screen
+                name='appConfig/alertConfig/index'
+                options={{
+                    title: 'Alertas',
+                    headerLeft: () => <BackButton to='/home/appConfig' />,
+                }}
+            />
             <Tabs.Screen name='addMed/index' options={{ title: 'Cadastro de Medicamento' }}/>
-            <Tabs.Screen/>
         </Tabs>
     );
 }

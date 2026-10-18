@@ -1,6 +1,5 @@
 import { collection, deleteField, doc, serverTimestamp, updateDoc, writeBatch } from 'firebase/firestore';
 
-// TODO: ajuste os caminhos
 import { auth, db } from '../config/firebaseConfig';
 import type { Medication } from '../schemas/medSchema';
 
