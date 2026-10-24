@@ -21,7 +21,7 @@ export const medSchema = z.object({
     medRepetitions: repetitionSchema,
     medName: z.string(),
     medSlot: z.string(),
-    medStock: z.number().positive(),
+    medStock: z.number().nonnegative(),
     medStockConsumption: z.number().positive(),
     medAdminRoute: z.string(),
     medDesc: z.string(),

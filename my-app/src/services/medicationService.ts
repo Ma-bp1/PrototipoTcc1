@@ -1,6 +1,11 @@
-import { collection, getDocs } from 'firebase/firestore'
+import { collection, getDocs, updateDoc } from 'firebase/firestore'
 import { auth, db } from '../config/firebaseConfig'
-import { medSchema, Medication } from '../schemas/medSchema'
+import { medSchema, Medication, MedData } from '../schemas/medSchema'
+import { getMedRef } from './doseService'
+
+export async function updateMedication(id: string, data: Partial<MedData>) {
+    await updateDoc(getMedRef(id), data)
+}
 
 export async function getMedications(): Promise<Medication[]> {
     const userId = auth.currentUser?.uid
@@ -10,13 +15,13 @@ export async function getMedications(): Promise<Medication[]> {
 
     const medications: Medication[] = []
 
-    snapshot.docs.forEach((doc) => {
-        const result = medSchema.safeParse(doc.data())
+    snapshot.docs.forEach((docSnap) => {
+        const result = medSchema.safeParse(docSnap.data())
 
         if (result.success) {
-            medications.push({ id: doc.id, ...result.data })
+            medications.push({ id: docSnap.id, ...result.data })
         } else {
-            console.warn(`Medicamento ${doc.id} inválido:`, result.error.flatten())
+            console.warn(`Medicamento ${docSnap.id} inválido:`, result.error.flatten())
         }
     })
 

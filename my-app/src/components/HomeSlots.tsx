@@ -18,6 +18,7 @@ import { cancelMedication } from '../notifications/scheduler'
 
 type HomeSlotsProps = {
     medications: Medication[]
+    onDeleted?: (id: string) => void
 }
 
 function RightAction({ translation }: { translation: SharedValue<number> }) {
@@ -44,7 +45,7 @@ function RightAction({ translation }: { translation: SharedValue<number> }) {
 }
 
 
-export function HomeSlots({ medications }: HomeSlotsProps) {
+export function HomeSlots({ medications, onDeleted }: HomeSlotsProps) {
 
     const totalSlots = [1, 2, 3, 4, 5, 6]
 
@@ -74,6 +75,7 @@ export function HomeSlots({ medications }: HomeSlotsProps) {
                             }
 
                             await deleteDoc(doc(db, 'users', userId, 'medications', med.id))
+                            onDeleted?.(med.id)
 
                             try {
                                 await cancelMedication(med.id)

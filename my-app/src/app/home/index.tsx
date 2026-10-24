@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, Alert, ScrollView, TouchableOpacity, Image, Pressable } from 'react-native'
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { Feather } from '@expo/vector-icons'
 import { MedData } from '../../schemas/medSchema'
 import { boolean } from 'zod'
@@ -10,11 +10,7 @@ import { HomeSlots } from '../../components/HomeSlots'
 import { useMedications } from '../../hooks/useMedication'
 import { useDoseActions } from '../../hooks/useDoseActions'
 
-
-/* revise this: like, what is this?
-type Medication = MedDataimport { HomeSlots } from '../../components/HomeSlots'
- & {id: string} */
-
+import { useFocusEffect } from 'expo-router'
 
 export default function Home(){
     
@@ -23,6 +19,11 @@ export default function Home(){
     const { medications, setMedications, isLoading, refetch } = useMedications()
     const { confirmarDose, adiarDose } = useDoseActions(medications, setMedications)
     
+    useFocusEffect(
+            useCallback(() => {
+                refetch()
+            }, [refetch])
+        )
 
     return (
         <View style = {styles.container}>
@@ -87,6 +88,9 @@ export default function Home(){
                 
                 <HomeSlots
                     medications={medications}
+                    onDeleted={(id) =>
+                        setMedications((prev) => prev.filter((m) => m.id !== id))
+                    }
                 />
                 
             </ScrollView>
