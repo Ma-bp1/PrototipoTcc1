@@ -71,6 +71,7 @@ function withTimeout<T>(p: Promise<T>, ms = 3000) {
 }
 
 export default function DoseAlert() {
+
   // notificação normal traz `time` ("15:30"); a de adiamento traz `doseMs`
   const { medId, time, doseMs: doseMsParam } = useLocalSearchParams<{
     medId: string;
@@ -82,17 +83,6 @@ export default function DoseAlert() {
   const [med, setMed] = useState<StoredMed | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    getAlertSettings().then(({ vibration }) => {
-      if (active && vibration) Vibration.vibrate([0, 500, 300, 500], true); // repete até sair
-    });
-    return () => {
-      active = false;
-      Vibration.cancel();
-    };
-  }, []);
 
   useEffect(() => {
     if (!medId) {
@@ -127,6 +117,36 @@ export default function DoseAlert() {
   const doseMs = doseMsParam
     ? Number(doseMsParam)
     : lastOccurrence(time ?? med?.medTime);
+
+  // Já confirmada pela home? (medLastConfirmed guarda o horário agendado da dose)
+  const jaConfirmada =
+  !!med?.medLastConfirmed && Number(med.medLastConfirmed) >= doseMs;
+
+  // Já adiada pela home e o adiamento ainda não venceu?
+  // (se veio doseMsParam, é a notificação do próprio adiamento → deve aparecer)
+  const adiadaAindaValida =
+  !doseMsParam &&
+  !!med?.medSnoozedUntil && // ← ajuste p/ o campo que o snoozeDoseInDb grava
+  Number(med.medSnoozedUntil) > Date.now();
+
+  const jaTratada = jaConfirmada || adiadaAindaValida;
+
+  useEffect(() => {
+    if (!loading && jaTratada) leave();
+  }, [loading, jaTratada]);
+
+
+  useEffect(() => {
+    if (loading || jaTratada) return;
+    let active = true;
+    getAlertSettings().then(({ vibration }) => {
+      if (active && vibration) Vibration.vibrate([0, 500, 300, 500], true);
+    });
+    return () => {
+      active = false;
+      Vibration.cancel();
+    };
+  }, [loading, jaTratada]);
 
   const handleConfirm = async () => {
     if (busy) return;
@@ -180,7 +200,7 @@ export default function DoseAlert() {
       <Text style={styles.header}>Lembrete de Administração{'\n'}de Medicamentos</Text>
 
       <View style={styles.center}>
-        {loading ? (
+        {loading || jaTratada ? (
           <ActivityIndicator color="#FFFFFF" size="large" />
         ) : (
           <>
