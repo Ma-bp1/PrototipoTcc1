@@ -134,7 +134,6 @@ export default function TabsLayout() {
                 }}
             />
             <Tabs.Screen name='addMed/index' options={{ title: 'Cadastro de Medicamento' }}/>
-            <Tabs.Screen name='esqueciSenha/index' options={{headerShown: false}}/>
         </Tabs>
     );
 }

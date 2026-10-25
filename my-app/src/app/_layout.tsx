@@ -41,6 +41,9 @@ export default function Layout() {
                     name="doseAlert"
                     options={{ presentation: 'fullScreenModal', headerShown: false }}
                 />
+                <Stack.Screen 
+                    name='esqueciSenha/index' options={{headerShown: false}}
+                />
             </Stack>
         </GestureHandlerRootView>
     );
