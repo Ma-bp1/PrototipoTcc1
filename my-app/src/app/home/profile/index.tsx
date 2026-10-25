@@ -3,6 +3,8 @@ import { Button } from '../../../components/Button'
 import { auth } from '../../../config/firebaseConfig'
 import { signOut } from 'firebase/auth'
 import { useRouter } from 'expo-router'
+import { Input } from '@/src/components/Input'
+import { AppText } from '@/src/components/AppText'
 
 export default function Profile(){
 
@@ -23,6 +25,21 @@ export default function Profile(){
     return (
         <View style = {styles.container}>
             <Text>Profile Screen</Text>
+
+            <AppText>
+                Nome:
+            </AppText>
+            <Input></Input>
+
+            <AppText>
+                E-mail:
+            </AppText>
+            <Input></Input>
+
+            <AppText>
+                Senha:
+            </AppText>
+            <Input></Input>
 
             <Button 
                 label='Sair da Conta' 

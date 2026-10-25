@@ -1,45 +1,65 @@
-import { View, Text, StyleSheet, Image, ScrollView} from 'react-native'
+import { View, Text, StyleSheet, Image, ScrollView, useWindowDimensions } from 'react-native'
 import { Button } from '../components/Button'
 import { useRouter } from 'expo-router'
 
 export default function Welcome() {
-
     const router = useRouter()
-   
+    const { width, height } = useWindowDimensions()
+
+    const logoWidth = width * 0.68
+    const logoHeight = logoWidth / 1.5 // Figma box ratio
+
     return (
-        <View style={styles.container}>
-            <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}>
-                <View style={{alignItems: 'center'}}>
+        <ScrollView
+            style={styles.container}
+            contentContainerStyle={{ flexGrow: 1 }}
+            showsVerticalScrollIndicator={false}
+        >
+            {/* Wrapper keeps at least a full screen of height, and scrolls if content is taller */}
+            <View style={{ flex: 1, minHeight: height }}>
+                <Image
+                    source={require('../../assets/welcome.png')}
+                    style={styles.background}
+                    resizeMode="cover"
+                />
+
+                {/* Logo */}
+                <View style={styles.logoContainer}>
                     <Image
-                        style={{position: 'absolute',}}
-                        source={require('../../assets/welcome.png')}
-                    />
-                </View>
-                
-                <View>
-                    <Image
-                        style={{marginTop: 100}}
                         source={require('../../assets/Chronomedi.png')}
+                        style={{ width: logoWidth, height: logoHeight }}
+                        resizeMode="contain"
                     />
                 </View>
 
-                <View style={{}}>
+                {/* Text + mascot */}
+                <View style={styles.content}>
+                    <View style={styles.textContainer}>
+                        <Text style={styles.title}>Bem vindo!</Text>
+                        <Text style={styles.subtitle}>
+                            Gerencie seus medicamentos de forma{' '}
+                            <Text style={{ fontStyle: 'italic' }}>simples</Text> e segura.
+                        </Text>
+                    </View>
+
                     <Image
-                        style={{position: 'absolute', top: '20%', left: '30%', transform: [{ scale: 0.8 }] }}
                         source={require('../../assets/mascot.png')}
+                        style={[
+                            styles.mascot,
+                            { width: width * 0.55, height: height * 0.4 },
+                        ]}
+                        resizeMode="contain"
                     />
                 </View>
 
-                <View style={{flex: 1}}>
-                    <Text style={styles.title}> Bem Vindo! </Text>
-                    <Text style={[styles.title, {fontSize: 24, fontWeight: 400, width: 160,}]}> 
-                        Gerencie seus medicamentos de forma simples e segura. 
-                    </Text>
+                {/* Button */}
+                <View style={styles.footer}>
+                    <View style={styles.buttonWrapper}>
+                        <Button label="Entrar" onPress={() => router.push('/login')} />
+                    </View>
                 </View>
-
-                <Button label='Vamos Começar!' onPress={()=>router.push('/login')}/>
-            </ScrollView>
-        </View>
+            </View>
+        </ScrollView>
     )
 }
 
@@ -48,11 +68,51 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#fff',
     },
+    background: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        width: '100%',
+        height: '75%',
+    },
+    logoContainer: {
+        alignItems: 'center',
+        marginTop: 40,
+    },
+    content: {
+        flex: 1,
+        marginTop: 10,
+    },
+    textContainer: {
+        paddingLeft: 24,
+        width: '55%',
+        zIndex: 2,
+    },
     title: {
         color: '#fff',
         fontWeight: 'bold',
-        fontSize: 36,
-        textAlign: 'left',
-        marginLeft: 30
-    }
+        fontSize: 32,
+        marginBottom: 12,
+    },
+    subtitle: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 20,
+        lineHeight: 28,
+    },
+    mascot: {
+        position: 'absolute',
+        right: 0,
+        bottom: 0,
+    },
+    footer: {
+        paddingBottom: 40,
+        paddingTop: 16,
+    },
+    buttonWrapper: {
+        alignSelf: 'center',
+        width: '50%',
+        minWidth: 160,
+    },
 })

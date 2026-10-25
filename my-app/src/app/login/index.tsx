@@ -13,7 +13,7 @@ import { auth } from '../../config/firebaseConfig'
 import { loginSchema, type LoginData } from '../../schemas/authSchema'
 
 
-export default function Home(){
+export default function Login(){
 
     const router = useRouter();
 
@@ -134,7 +134,12 @@ export default function Home(){
                 {errors.ipBox && <AppText>{errors.ipBox.message}</AppText>}
             </View>
 
-            <AppText fontSize={18} style={{textAlign: 'left', marginLeft: 40, width: '100%', color: '#198289'}}> Esqueci minha Senha </AppText>
+            <Link href='/esqueciSenha' asChild>
+                <AppText fontSize={18} style={{textAlign: 'left', marginLeft: 40, width: '100%', color: '#198289'}}> 
+                    Esqueci minha Senha 
+                </AppText>
+            </Link>
+            
             
             <Link href='/signUp' asChild>
                 <AppText fontSize={18} style={{textAlign: 'left', marginLeft: 40, marginTop: 10, width: '100%', color: '#198289'}}> Não tem cadastro ainda? Cadastre-se. </AppText>
