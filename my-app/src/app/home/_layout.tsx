@@ -134,6 +134,9 @@ export default function TabsLayout() {
                 }}
             />
             <Tabs.Screen name='addMed/index' options={{ title: 'Cadastro de Medicamento' }}/>
+            <Tabs.Screen name='appConfig/contato' options={{ title: 'Contato' }}/>
+            <Tabs.Screen name='appConfig/relatorio' options={{ title: 'Relatório de Uso de Medicamento' }}/>
+            <Tabs.Screen name='appConfig/premium' options={{ title: 'Adquirir Premium' }}/>
         </Tabs>
     );
 }

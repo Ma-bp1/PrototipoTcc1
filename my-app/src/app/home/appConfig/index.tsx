@@ -33,7 +33,8 @@ export default function AppConfig(){
                 <View style={styles.configBox}>
                     <ConfigItem
                         icon={<Feather name='lock' size={28} color='#31AEAE' />}
-                        label='Conta e Dados'
+                        label='Conta e Dados (Perfil)'
+                        onPress={() => router.push('/home/profile')}
                     />
                     <ConfigItem
                         icon={<Feather name='bell' size={28} color='#31AEAE' />}
@@ -43,14 +44,17 @@ export default function AppConfig(){
                     <ConfigItem
                         icon={<Feather name='paperclip' size={28} color='#31AEAE' />}
                         label='Relatório de Uso de Medicamento'
+                        onPress={() => router.push('/home/appConfig/relatorio')}
                     />
                     <ConfigItem
                         icon={<Feather name='phone' size={28} color='#31AEAE' />}
                         label='Contato'
+                        onPress={() => router.push('/home/appConfig/contato')}
                     />
                     <ConfigItem
                         icon={<MaterialCommunityIcons name='crown-outline' size={28} color='#31AEAE' />}
                         label='Premium'
+                        onPress={() => router.push('/home/appConfig/premium')}
                     />
                 </View>
             </ScrollView>
