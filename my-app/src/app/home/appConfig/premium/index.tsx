@@ -1,172 +1,144 @@
-import { useEffect, useRef, useState } from 'react';
+import React from 'react'
 import {
-  ActivityIndicator,
-  Alert,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import QRCode from 'react-native-qrcode-svg';
-import { auth } from '@/services/firebase'; // ajuste o caminho
-import {
-  criarSessaoPremium,
-  montarUrlQr,
-  observarSessao,
-  PLANOS,
-  Plano,
-  SessaoCriada,
-} from '@/services/premiumService';
+    View,
+    Text,
+    Image,
+    ScrollView,
+    TouchableOpacity,
+    StyleSheet,
+} from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { QuestionButton } from '../../../../components/QuestionButton'
 
-/** Formata o tempo restante como "23h 30m 6s". */
-function useContagem(expiraEm: Date | null): string {
-  const [restanteMs, setRestanteMs] = useState(0);
+const qrcode = require('../../../../../assets/qrcode.png')
 
-  useEffect(() => {
-    if (!expiraEm) return;
-    const atualizar = () =>
-      setRestanteMs(Math.max(0, expiraEm.getTime() - Date.now()));
-    atualizar();
-    const timer = setInterval(atualizar, 1000);
-    return () => clearInterval(timer);
-  }, [expiraEm]);
-
-  const total = Math.floor(restanteMs / 1000);
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  return `${h}h ${m}m ${s}s`;
+const cores = {
+    primaria: '#2DB5B0', 
+    texto: '#0B5C4D',
+    fundo: '#F0F0F0',
+    branco: '#FFFFFF',
+    rosa: '#FF6F91',
 }
 
-export default function PremiumScreen() {
-  const router = useRouter();
-  const uid = auth.currentUser?.uid;
-
-  const [plano, setPlano] = useState<Plano>('mensal');
-  const [sessao, setSessao] = useState<SessaoCriada | null>(null);
-  const [erro, setErro] = useState(false);
-  const jaAvisou = useRef(false);
-
-  const contagem = useContagem(sessao?.expiraEm ?? null);
-
-  // 1) Cria uma sessão nova sempre que o plano muda
-  useEffect(() => {
-    if (!uid) return;
-    let ativo = true;
-    setSessao(null);
-    setErro(false);
-
-    criarSessaoPremium(uid, plano)
-      .then((nova) => ativo && setSessao(nova))
-      .catch(() => ativo && setErro(true));
-
-    return () => {
-      ativo = false;
-    };
-  }, [plano, uid]);
-
-  // 2) Escuta a sessão: quando "escaneado" vira true, libera o premium
-  useEffect(() => {
-    if (!sessao) return;
-
-    return observarSessao(sessao.id, (dados) => {
-      if (dados?.escaneado && !jaAvisou.current) {
-        jaAvisou.current = true;
-        Alert.alert('Premium ativado!', 'QR Code lido com sucesso.', [
-          { text: 'OK', onPress: () => router.back() },
-        ]);
-      }
-    });
-  }, [sessao, router]);
-
-  if (!uid) {
+export default function AdquirirPremiumScreen({ navigation }: any) {
     return (
-      <View style={s.centro}>
-        <Text style={s.instrucao}>Faça login para adquirir o Premium.</Text>
-      </View>
-    );
-  }
+        <SafeAreaView style={styles.safe} edges={['top']}>
+            <View style={styles.conteudoWrapper}>
+                <QuestionButton
+                    style={styles.ajuda}
+                    titulo="Como pagar com Pix"
+                    paragrafos={[
+                        'Escolha o plano desejado (mensal ou anual).',
+                        'Abra o app do seu banco e escaneie o QR Code, ou use o Pix Copia e Cola.',
+                        'Após o pagamento, seu acesso Premium será liberado.',
+                        'O usuário poderá fazer a assinatura premium através de pagamento via PIX. Porém, a cobrança não é automática.'
+                    ]}
+                />
 
-  return (
-    <View style={s.container}>
-      <View style={s.abas}>
-        {(Object.keys(PLANOS) as Plano[]).map((p) => (
-          <TouchableOpacity
-            key={p}
-            style={[s.aba, plano === p && s.abaAtiva]}
-            onPress={() => setPlano(p)}
-            accessibilityRole="button"
-            accessibilityState={{ selected: plano === p }}
-          >
-            <Text style={[s.abaTexto, plano === p && s.abaTextoAtivo]}>
-              {PLANOS[p].abaLabel}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+                <ScrollView
+                    contentContainerStyle={styles.conteudo}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {/* Plano mensal */}
+                    <Text style={styles.tituloPlano}>Assinatura - R$ 30 (Mensal)</Text>
+                    <View style={styles.qrCard}>
+                        <Image source={qrcode} style={styles.qr} resizeMode="contain" />
+                    </View>
 
-      <Text style={s.titulo}>{PLANOS[plano].titulo}</Text>
+                    <Text style={styles.instrucao}>
+                        Abra o app do seu banco e insira o código copia e cola, ou escaneie o
+                        QR Code.
+                    </Text>
 
-      <View style={s.qrBox}>
-        {erro ? (
-          <Text style={s.instrucao}>Não foi possível gerar o QR Code.</Text>
-        ) : sessao ? (
-          <QRCode value={montarUrlQr(sessao.id)} size={200} />
-        ) : (
-          <ActivityIndicator size="large" color="#2FA8A0" />
-        )}
-      </View>
+                    {/* Plano anual */}
+                    <Text style={styles.tituloPlano}>Assinatura - R$ 230 (Anual)</Text>
+                    <View style={styles.qrCard}>
+                        <Image source={qrcode} style={styles.qr} resizeMode="contain" />
+                    </View>
 
-      <Text style={s.instrucao}>
-        Escaneie o QR Code com a câmera de outro celular para ativar o Premium.
-      </Text>
+                    {/* Ação principal */}
+                    <TouchableOpacity style={styles.botaoCopiar} activeOpacity={0.8}>
+                        <Text style={styles.botaoCopiarLabel}>Copiar Pix Copia e Cola</Text>
+                    </TouchableOpacity>
 
-      <Text style={s.prazo}>
-        {sessao ? `Prazo de leitura: ${contagem}` : 'Gerando QR Code...'}
-      </Text>
-    </View>
-  );
+                    <Text style={styles.prazo}>Prazo de Pagamento: 23h 30m 6s</Text>
+                </ScrollView>
+            </View>
+        </SafeAreaView>
+    )
 }
 
-const s = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#F2F7F6',
-  },
-  centro: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F2F7F6',
-  },
-  abas: { flexDirection: 'row', gap: 8, marginBottom: 20 },
-  aba: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    backgroundColor: '#DFEEED',
-  },
-  abaAtiva: { backgroundColor: '#2FA8A0' },
-  abaTexto: { color: '#0B5A55', fontWeight: '600' },
-  abaTextoAtivo: { color: '#FFFFFF' },
-  titulo: { fontSize: 17, color: '#0B5A55', marginBottom: 12 },
-  qrBox: {
-    width: 232,
-    height: 232,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 4,
-  },
-  instrucao: {
-    textAlign: 'center',
-    fontSize: 13,
-    color: '#1F2D2C',
-    marginVertical: 14,
-    paddingHorizontal: 12,
-  },
-  prazo: { fontSize: 12, color: '#4A5C5A' },
-});
+const styles = StyleSheet.create({
+    safe: {
+        flex: 1,
+    },
+    voltar: {
+        position: 'absolute',
+        left: 12,
+        top: 0,
+        bottom: 0,
+        width: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    voltarIcone: {
+        fontSize: 26,
+        color: cores.branco,
+    },
+    conteudoWrapper: {
+        flex: 1,
+        backgroundColor: cores.fundo,
+    },
+    ajuda: {
+        position: 'absolute',
+        top: 10,
+        right: 12,
+        zIndex: 1,
+    },
+    conteudo: {
+        alignItems: 'center',
+        paddingTop: 28,
+        paddingBottom: 32,
+        paddingHorizontal: 24,
+    },
+    tituloPlano: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: cores.texto,
+        textAlign: 'center',
+        marginBottom: 12,
+    },
+    qrCard: {
+        backgroundColor: cores.branco,
+        padding: 8,
+        marginBottom: 12,
+    },
+    qr: {
+        width: 140,
+        height: 140,
+    },
+    instrucao: {
+        fontSize: 12,
+        color: cores.texto,
+        textAlign: 'center',
+        marginBottom: 14,
+        paddingHorizontal: 8,
+    },
+    botaoCopiar: {
+        marginTop: 16,
+        backgroundColor: cores.rosa,
+        borderRadius: 999,
+        paddingVertical: 10,
+        paddingHorizontal: 22,
+    },
+    botaoCopiarLabel: {
+        color: cores.branco,
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    prazo: {
+        marginTop: 16,
+        fontSize: 12,
+        color: cores.texto,
+    },
+})
