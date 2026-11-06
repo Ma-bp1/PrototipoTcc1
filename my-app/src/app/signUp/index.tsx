@@ -1,4 +1,4 @@
-import {View, StyleSheet, ScrollView, Alert, Image} from 'react-native'
+import {View, StyleSheet, ScrollView, Alert, Image, KeyboardAvoidingView} from 'react-native'
 import { useState } from 'react'
 import {Button} from '../../components/Button'
 import {Input} from '../../components/Input'
@@ -11,6 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { createUserWithEmailAndPassword, signOut } from 'firebase/auth'
 import { auth, db } from '../../config/firebaseConfig'
 import { signUpSchema, type SignUpData } from '../../schemas/authSchema'
+import { PasswordInput } from '@/src/components/PasswordInput'
 
 export default function signUp(){
 
@@ -50,8 +51,15 @@ export default function signUp(){
     }
 
     return (
-        <ScrollView>
-            <View style={styles.container}>
+        <KeyboardAvoidingView
+            style={{flex: 1}}
+            behavior='height'
+        >
+            <ScrollView
+                contentContainerStyle={styles.container}
+                keyboardShouldPersistTaps='handled'
+                showsHorizontalScrollIndicator={false}
+            >
                 <View>
                     <Image source={require('../../../assets/Chronomedi.png')}
                         style={{height: 200, width: 250}}
@@ -117,20 +125,11 @@ export default function signUp(){
                         control={control}
                         name='password'
                         render= {({field: {onChange, onBlur, value} }) => (
-                            <Input 
-                                style={{
-                                    shadowColor: '#000',
-                                    shadowOffset: { width: 0, height: 2 },
-                                    shadowOpacity: 0.05,
-                                    shadowRadius: 6,
-                                    elevation: 4,
-                                }}
+                            <PasswordInput
                                 placeholder=''
                                 onBlur={onBlur}
                                 onChangeText={onChange}
                                 value={value}
-                                secureTextEntry={true}
-                                autoCapitalize='none'
                             />
                         )}
                     />
@@ -143,20 +142,11 @@ export default function signUp(){
                         control={control}
                         name='confirmPassword'
                         render= {({field: {onChange, onBlur, value} }) => (
-                            <Input 
-                                style={{
-                                    shadowColor: '#000',
-                                    shadowOffset: { width: 0, height: 2 },
-                                    shadowOpacity: 0.05,
-                                    shadowRadius: 6,
-                                    elevation: 4,
-                                }}
+                            <PasswordInput
                                 placeholder=''
                                 onBlur={onBlur}
                                 onChangeText={onChange}
                                 value={value}
-                                secureTextEntry={true}
-                                autoCapitalize='none'
                             />
                         )}
                     />
@@ -191,17 +181,16 @@ export default function signUp(){
                     label={isLoading ? 'Aguarde...' : 'Cadastrar'}
                     onPress={ handleSubmit(handleSignUpData) }
                 />
-            </View>
-        </ScrollView>
+            </ScrollView>
+        </KeyboardAvoidingView>
     )
 }
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 100,
-        marginBottom: 100,
+        marginTop: 30,
+        paddingBottom: 100     
     }
 })

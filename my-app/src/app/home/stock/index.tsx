@@ -98,6 +98,7 @@ const styles = StyleSheet.create({
     container: {
         padding: 16,
         gap: 12,
+        paddingBottom: 150,
     },
     slotCard: {
         flexDirection: 'row',

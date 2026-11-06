@@ -114,9 +114,13 @@ export function HomeSlots({ medications, onDeleted }: HomeSlotsProps) {
                             <View style={styles.slotHeaderRow}>
                                 <AppText style={styles.slotTitle}>Slot {slotNumber}</AppText>
                                 {isLowStock && (
-                                    <View>
-                                        <AppText style={styles.lowStockText}> Estoque Baixo! </AppText>
-                                    </View>
+                                    <Pressable
+                                        style={styles.lowStockBadge}
+                                        hitSlop={8}
+                                        onPress={() => router.navigate('/home/stock')}
+                                    >
+                                        <AppText style={styles.lowStockText}>Estoque Baixo!</AppText>
+                                    </Pressable>
                                 )}
                             </View>
 
@@ -145,7 +149,7 @@ export function HomeSlots({ medications, onDeleted }: HomeSlotsProps) {
                     </Pressable >
                 )  
 
-                if (!med) return <View key={slotNumber}>{card}</View>
+                if (!med) return <View key={slotNumber} style={styles.slotWrapper}>{card}</View>
 
                 return (
                     <Swipeable
@@ -219,7 +223,7 @@ const styles = StyleSheet.create({
     },
     lowStockText: {
         color: '#fff',
-        fontSize: 10,
+        fontSize: 15,
     },
     editButton: {
         padding: 5,

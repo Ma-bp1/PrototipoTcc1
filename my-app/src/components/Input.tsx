@@ -1,10 +1,14 @@
 import { View, TextInput, TextInputProps, Text, StyleSheet, Dimensions } from "react-native";
+import { useState } from "react"
 
 const screenWidth = Dimensions.get('window').width
 
 type TextProps = TextInputProps
 
 export function Input({style, ...rest}: TextProps){
+    
+    const [showPassword, setShowPassword] = useState(false)
+
     return(
             <TextInput 
                 style={[styles.container, style]} {...rest}

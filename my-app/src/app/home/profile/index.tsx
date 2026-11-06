@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, Alert, Image, Pressable, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, Alert, Image, Pressable, ScrollView, KeyboardTypeOptions } from 'react-native'
 import { Feather } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
-import { signOut, updatePassword, verifyBeforeUpdateEmail } from 'firebase/auth'
+import { onAuthStateChanged, signOut, updatePassword } from 'firebase/auth'
 import { doc, getDoc, getFirestore, setDoc } from 'firebase/firestore'
+import { z } from 'zod'
 
 import { Button } from '../../../components/Button'
 import { auth } from '../../../config/firebaseConfig'
 import { Input } from '@/src/components/Input'
 import { AppText } from '@/src/components/AppText'
+import { loginSchema } from '@/src/schemas/authSchema'
+import { PasswordInput } from '@/src/components/passwordInput'
 
 const db = getFirestore(auth.app)
 
@@ -17,124 +20,224 @@ const TEAL = '#1E8A8A'
 const TEAL_DARK = '#0F5C5C'
 const PINK = '#E5566D'
 
-type FieldKey = 'name' | 'email' | 'password'
+type FieldKey = 'fullName' | 'email' | 'password' | 'ipBox'
 
-type ProfileFieldProps = {
+type FieldConfig = {
     label: string
-    value: string
-    editing: boolean
-    onChangeText: (text: string) => void
-    onPressEdit: () => void
-    secureTextEntry?: boolean
+    newLabel: string
+    schema: z.ZodType
+    error: string
     placeholder?: string
+    keyboardType?: KeyboardTypeOptions
+    secure?: boolean
+    isPassword?: boolean
 }
 
-// Campo com botão de edição (Pressable + ícone Feather)
-function ProfileField({
-    label,
-    value,
-    editing,
-    onChangeText,
-    onPressEdit,
-    secureTextEntry,
-    placeholder,
-}: ProfileFieldProps) {
+// Configuração de cada campo: rótulos, validação (reaproveita o authSchema) e mensagem de erro
+const FIELDS: Record<FieldKey, FieldConfig> = {
+    fullName: {
+        label: 'Nome:',
+        newLabel: 'Novo nome:',
+        schema: z.string().min(6),
+        error: 'O nome precisa ter pelo menos 6 caracteres.',
+    },
+    email: {
+        label: 'E-mail:',
+        newLabel: 'Novo e-mail:',
+        schema: loginSchema.shape.email,
+        error: 'Digite um e-mail válido.',
+        keyboardType: 'email-address',
+    },
+    password: {
+        label: 'Senha:',
+        newLabel: 'Nova senha:',
+        schema: loginSchema.shape.password,
+        error: 'A senha precisa ter pelo menos 6 caracteres.',
+        placeholder: 'Nova senha',
+        secure: true,
+        isPassword: true
+    },
+    ipBox: {
+        label: 'IP da caixa:',
+        newLabel: 'Novo IP da caixa:',
+        schema: loginSchema.shape.ipBox,
+        error: 'Digite um IP válido (ex.: 192.168.0.10).',
+        placeholder: '192.168.0.10',
+        keyboardType: 'numbers-and-punctuation',
+    },
+}
+
+const FIELD_ORDER: FieldKey[] = ['fullName', 'email', 'password', 'ipBox']
+
+type ProfileFieldProps = {
+    config: FieldConfig
+    value: string
+    editing: boolean
+    draft: string
+    onChangeDraft: (text: string) => void
+    onPressEdit: () => void
+    onCancel: () => void
+}
+
+// Campo atual (somente leitura) + botão editar/confirmar. Ao editar, surge o campo "Novo ..."
+function ProfileField({ config, value, editing, draft, onChangeDraft, onPressEdit, onCancel }: ProfileFieldProps) {
+    const newFieldProps = {
+        value: draft,
+        onChangeText: onChangeDraft,
+        placeholder: config.placeholder,
+        autoCapitalize: 'none' as const,
+        autoFocus: true,
+    }
+    
     return (
         <View style={styles.field}>
-            <AppText>{label}</AppText>
+            <AppText>{config.label}</AppText>
 
             <View>
-                <Input
-                    value={value}
-                    onChangeText={onChangeText}
-                    editable={editing}
-                    secureTextEntry={secureTextEntry}
-                    placeholder={placeholder}
-                    autoCapitalize="none"
-                />
+                <Input value={value} editable={false} autoCapitalize="none" />
 
                 <Pressable onPress={onPressEdit} hitSlop={10} style={styles.fieldIcon}>
                     <Feather name={editing ? 'check' : 'edit'} size={20} color={TEAL} />
                 </Pressable>
             </View>
+
+            {editing && (
+                <View style={styles.newField}>
+                    <AppText>{config.newLabel}</AppText>
+                    
+                    {config.isPassword ? (
+                        <PasswordInput {...newFieldProps} />
+                    ) : (
+                        <Input {...newFieldProps} keyboardType={config.keyboardType}/>
+                    )}
+                    <Pressable onPress={onCancel} hitSlop={10}>
+                        <Text style={styles.cancel}>Cancelar</Text>
+                    </Pressable>
+                </View>
+            )}
         </View>
     )
+}
+
+// TODO: função base do envio do código de verificação do novo e-mail.
+// Implementar quando a autenticação por e-mail estiver ativa no Firebase.
+// Obs.: o Firebase envia um LINK de confirmação (não um código numérico) com verifyBeforeUpdateEmail.
+// Se quiser um código de verdade, será preciso uma Cloud Function própria.
+async function sendEmailVerification(newEmail: string) {
+     
+    console.log('[TODO] enviar verificação para:', newEmail)
 }
 
 export default function Profile() {
     const router = useRouter()
 
-    const [name, setName] = useState('')
-    const [email, setEmail] = useState('')
-    const [password, setPassword] = useState('')
+    const [data, setData] = useState({ fullName: '', email: '', ipBox: '' })
     const [photo, setPhoto] = useState<string | null>(null)
     const [editing, setEditing] = useState<FieldKey | null>(null)
+    const [draft, setDraft] = useState('') //só um campo é editado por vez
 
-    // Carrega os dados do usuário (e-mail vem do Auth; nome e foto, do Firestore)
     useEffect(() => {
-        async function loadProfile() {
-            const user = auth.currentUser
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (!user) return
 
-            setEmail(user.email ?? '')
-            setName(user.displayName ?? '')
+            setData((prev) => ({
+                ...prev,
+                email: user.email ?? '',
+                fullName: user.displayName ?? '',
+            }))
 
             try {
                 const snap = await getDoc(doc(db, 'users', user.uid))
                 if (snap.exists()) {
-                    setName(snap.data().name ?? user.displayName ?? '')
-                    setPhoto(snap.data().photo ?? null)
+                    const d = snap.data()
+                    setData((prev) => ({
+                        ...prev,
+                        fullName: d.fullName ?? d.name ?? prev.fullName,
+                        ipBox: d.ipBox ?? '',
+                    }))
+                    setPhoto(d.photo ?? null)
                 }
             } catch (error) {
                 console.error('Erro ao carregar o perfil.', error)
             }
-        }
+        })
 
-        loadProfile()
+        return unsubscribe
     }, [])
 
+    function closeEditing() {
+        setEditing(null)
+        setDraft('')
+    }
+
+    function handleSaveError(error: any) {
+        console.error('Erro ao salvar.', error)
+        Alert.alert(
+            error?.code === 'auth/requires-recent-login'
+                ? 'Por segurança, saia da conta, entre de novo e tente outra vez.'
+                : 'Não foi possível salvar a alteração.'
+        )
+    }
+
     async function handlePressEdit(field: FieldKey) {
-        // 1º toque: libera o campo para edição
+        // 1º toque: abre o campo "Novo ..."
         if (editing !== field) {
             setEditing(field)
-            setPassword('')
+            setDraft('')
             return
         }
 
-        // 2º toque: salva
+        // 2º toque: valida e salva
         const user = auth.currentUser
         if (!user) return
 
-        try {
-            if (field === 'name') {
-                await setDoc(doc(db, 'users', user.uid), { name: name.trim() }, { merge: true })
+        const config = FIELDS[field]
+        const value = field === 'password' ? draft : draft.trim()
+
+        if (!config.schema.safeParse(value).success) {
+            Alert.alert(config.error)
+            return
+        }
+
+        // E-mail: pede confirmação antes de enviar o código de verificação
+        if (field === 'email') {
+            if (value === user.email) {
+                Alert.alert('O novo e-mail é igual ao atual.')
+                return
             }
 
-            if (field === 'email' && email.trim() !== user.email) {
-                // O Firebase só troca o e-mail depois que o usuário clica no link enviado
-                await verifyBeforeUpdateEmail(user, email.trim())
-                setEmail(user.email ?? '')
-                Alert.alert('Confirme o novo e-mail', 'Enviamos um link de confirmação para ele.')
+            Alert.alert('Confirmar alteração', `Enviar o código de verificação para ${value}?`, [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Enviar código',
+                    onPress: async () => {
+                        try {
+                            await sendEmailVerification(value)
+                            closeEditing()
+                            Alert.alert('Verifique seu e-mail', 'Enviamos a confirmação para o novo endereço.')
+                        } catch (error) {
+                            handleSaveError(error)
+                        }
+                    },
+                },
+            ])
+            return
+        }
+
+        try {
+            if (field === 'fullName' || field === 'ipBox') {
+                await setDoc(doc(db, 'users', user.uid), { [field]: value }, { merge: true })
+                setData((prev) => ({ ...prev, [field]: value }))
             }
 
             if (field === 'password') {
-                if (password.length < 6) {
-                    Alert.alert('A senha precisa ter pelo menos 6 caracteres.')
-                    return
-                }
-                await updatePassword(user, password)
-                setPassword('')
+                await updatePassword(user, value)
                 Alert.alert('Senha atualizada.')
             }
 
-            setEditing(null)
-        } catch (error: any) {
-            console.error('Erro ao salvar.', error)
-            Alert.alert(
-                error?.code === 'auth/requires-recent-login'
-                    ? 'Por segurança, saia da conta, entre de novo e tente outra vez.'
-                    : 'Não foi possível salvar a alteração.'
-            )
+            closeEditing()
+        } catch (error) {
+            handleSaveError(error)
         }
     }
 
@@ -146,7 +249,7 @@ export default function Profile() {
             mediaTypes: ['images'],
             allowsEditing: true,
             aspect: [1, 1],
-            quality: 0.2, // qualidade baixa para a imagem caber no Firestore (limite de 1 MB por documento)
+            quality: 0.2, // qualidade baixa para a imagem caber no Firestore
             base64: true,
         })
 
@@ -180,6 +283,11 @@ export default function Profile() {
         }
     }
 
+    // Valor exibido no campo atual (a senha nunca é exibida)
+    function displayValue(field: FieldKey) {
+        return field === 'password' ? '*********' : data[field]
+    }
+
     return (
         <ScrollView
             style={styles.screen}
@@ -205,31 +313,18 @@ export default function Profile() {
 
             {/* Dados */}
             <View style={styles.card}>
-                <ProfileField
-                    label="Nome:"
-                    value={name}
-                    editing={editing === 'name'}
-                    onChangeText={setName}
-                    onPressEdit={() => handlePressEdit('name')}
-                />
-
-                <ProfileField
-                    label="E-mail:"
-                    value={email}
-                    editing={editing === 'email'}
-                    onChangeText={setEmail}
-                    onPressEdit={() => handlePressEdit('email')}
-                />
-
-                <ProfileField
-                    label="Senha:"
-                    value={editing === 'password' ? password : '*********'}
-                    editing={editing === 'password'}
-                    onChangeText={setPassword}
-                    onPressEdit={() => handlePressEdit('password')}
-                    secureTextEntry={editing === 'password'}
-                    placeholder="Nova senha"
-                />
+                {FIELD_ORDER.map((field) => (
+                    <ProfileField
+                        key={field}
+                        config={FIELDS[field]}
+                        value={displayValue(field)}
+                        editing={editing === field}
+                        draft={draft}
+                        onChangeDraft={setDraft}
+                        onPressEdit={() => handlePressEdit(field)}
+                        onCancel={closeEditing}
+                    />
+                ))}
             </View>
 
             <View style={styles.buttons}>
@@ -248,7 +343,7 @@ const styles = StyleSheet.create({
     container: {
         alignItems: 'center',
         paddingTop: 24,
-        paddingBottom: 120, // espaço para a tab bar
+        paddingBottom: 120,
         paddingHorizontal: 20,
     },
     avatarWrapper: {
@@ -297,6 +392,15 @@ const styles = StyleSheet.create({
         top: 0,
         bottom: 0,
         justifyContent: 'center',
+    },
+    newField: {
+        gap: 4,
+        marginTop: 4,
+    },
+    cancel: {
+        alignSelf: 'flex-end',
+        fontSize: 14,
+        color: PINK,
     },
     buttons: {
         width: '100%',

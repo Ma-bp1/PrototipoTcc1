@@ -1,8 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, Switch, Alert, ActivityIndicator } from 'react-native'
 import { useEffect, useState } from 'react'
 import { AppText } from '../../../../components/AppText'
-
-// TODO: ajuste os caminhos conforme onde você salvou os arquivos
 import {
     AlertSettings,
     getAlertSettings,
@@ -52,7 +50,7 @@ export default function AlertConfig() {
         setSyncing(true)
 
         try {
-            // salva primeiro: o agendador lê esta configuração
+
             await saveAlertSettings(next)
 
             if (key === 'medAlert') {

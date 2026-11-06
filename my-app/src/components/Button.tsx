@@ -56,7 +56,8 @@ const styles = StyleSheet.create({
     },
     whiteLabel: {
         color: '#05534E',
-        fontSize: 24
+        fontSize: 24,
+        textAlign: 'left'
     },
     blue: {
         backgroundColor:'#31AEAE'
@@ -70,6 +71,7 @@ const styles = StyleSheet.create({
         
     },
     white: {
-        backgroundColor: '#fff'
+        backgroundColor: '#fff',
+        width: '90%'
     }
 })

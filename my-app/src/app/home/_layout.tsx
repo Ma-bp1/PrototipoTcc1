@@ -1,5 +1,5 @@
 import { Tabs, useRouter, Href } from 'expo-router';
-import { View, Pressable, StyleSheet, Text } from 'react-native';
+import { View, Pressable, StyleSheet, Text, useWindowDimensions } from 'react-native';
 import { CustomTabButton } from '../../components/CustomTabButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
@@ -97,6 +97,9 @@ function CustomTabBar({state, navigation}: { state: any; navigation: any }) {
 }
 
 export default function TabsLayout() {
+    const {width} = useWindowDimensions()
+    const titleMaxWidth = width - 72 * 2
+
     return (
         <Tabs
             tabBar={(props)=> <CustomTabBar {...props}/>}
@@ -114,6 +117,7 @@ export default function TabsLayout() {
                             fontSize: 20,
                             fontWeight: '600',
                             textAlign: 'center',
+                            maxWidth: titleMaxWidth,
                         }}
                     >
                         {children}
@@ -134,9 +138,21 @@ export default function TabsLayout() {
                 }}
             />
             <Tabs.Screen name='addMed/index' options={{ title: 'Cadastro de Medicamento' }}/>
-            <Tabs.Screen name='appConfig/contato' options={{ title: 'Contato' }}/>
-            <Tabs.Screen name='appConfig/relatorio' options={{ title: 'Relatório de Uso de Medicamento' }}/>
-            <Tabs.Screen name='appConfig/premium' options={{ title: 'Adquirir Premium' }}/>
+            <Tabs.Screen name='appConfig/contato'  
+                options={{ 
+                    title: 'Contato', 
+                    headerLeft: () => <BackButton to='/home/appConfig'/>,
+                }}/>
+            <Tabs.Screen name='appConfig/relatorio' 
+                options={{ 
+                    title: 'Relatório de Uso de Medicamento',
+                    headerLeft: () => <BackButton to='/home/appConfig'/>, 
+                }}/>
+            <Tabs.Screen name='appConfig/premium' 
+                options={{ 
+                    title: 'Adquirir Premium',
+                    headerLeft: () => <BackButton to='/home/appConfig'/>,
+                }}/>
         </Tabs>
     );
 }

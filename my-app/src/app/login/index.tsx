@@ -1,4 +1,4 @@
-import {View,  StyleSheet, Image} from 'react-native'
+import {View,  StyleSheet, Image, KeyboardAvoidingView, ScrollView, Pressable} from 'react-native'
 import { useState } from 'react'
 import {Button} from '../../components/Button'
 import {Input} from '../../components/Input'
@@ -11,6 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { signInWithEmailAndPassword } from 'firebase/auth'
 import { auth } from '../../config/firebaseConfig'
 import { loginSchema, type LoginData } from '../../schemas/authSchema'
+import { PasswordInput } from '@/src/components/PasswordInput'
 
 
 export default function Login(){
@@ -46,111 +47,110 @@ export default function Login(){
     }
 
     return (
+        <KeyboardAvoidingView
+            style={{flex: 1}}
+            behavior='height'
+        >
+            <ScrollView
+                contentContainerStyle={styles.container}
+                keyboardShouldPersistTaps='handled'
+                showsHorizontalScrollIndicator={false}
+            >
+                <View>
+                    <Image source={require('../../../assets/Chronomedi.png')}
+                        style={{height: 200, width: 250}}
+                    />
+                </View>
 
-        <View style={styles.container}>
-            <View>
-                <Image source={require('../../../assets/Chronomedi.png')}
-                    style={{height: 200, width: 250}}
-                />
-            </View>
-
-            <AppText style={{fontWeight: 'bold', fontSize: 26, marginBottom: 30}}> 
-                Login 
-            </AppText>
-
-            <AppText> E-mail </AppText>
-            <View style={{width: '90%'}}>
-                <Controller
-                    control={control}
-                    name='email'
-                    render= {({field: {onChange, onBlur, value} }) => (
-                        <Input 
-                            style={{
-                                    shadowColor: '#000',
-                                    shadowOffset: { width: 0, height: 2 },
-                                    shadowOpacity: 0.05,
-                                    shadowRadius: 6,
-                                    elevation: 4,
-                                }}
-                            placeholder=''
-                            onBlur={onBlur}
-                            onChangeText={onChange}
-                            value={value}
-                            keyboardType='email-address'
-                            autoCapitalize='none'
-                        />
-                    )}
-                />
-                {errors.email && <AppText>{errors.email.message}</AppText>}
-            </View>
-
-            <AppText> Senha </AppText>
-            <View style={{width: '90%'}}>
-                <Controller
-                    control={control}
-                    name='password'
-                    render= {({field: {onChange, onBlur, value} }) => (
-                        <Input
-                            style={{
-                                    shadowColor: '#000',
-                                    shadowOffset: { width: 0, height: 2 },
-                                    shadowOpacity: 0.05,
-                                    shadowRadius: 6,
-                                    elevation: 4,
-                                }} 
-                            placeholder=''
-                            onBlur={onBlur}
-                            onChangeText={onChange}
-                            value={value}
-                            secureTextEntry={true}
-                            autoCapitalize='none'
-                        />
-                    )}
-                />
-                {errors.password && <AppText>{errors.password.message}</AppText>}
-            </View>
-
-            <AppText>Ip da Caixa</AppText>
-            <View style={{width: '90%'}}>
-                <Controller
-                    control={control}
-                    name='ipBox'
-                    render= {({field: {onChange, onBlur, value} }) => (
-                        <Input
-                            style={{
-                                    shadowColor: '#000',
-                                    shadowOffset: { width: 0, height: 2 },
-                                    shadowOpacity: 0.05,
-                                    shadowRadius: 6,
-                                    elevation: 4,
-                                }} 
-                            placeholder=''
-                            onBlur={onBlur}
-                            onChangeText={onChange}
-                            value={value}
-                        />
-                    )}
-                />
-                {errors.ipBox && <AppText>{errors.ipBox.message}</AppText>}
-            </View>
-
-            <Link href='/esqueciSenha' asChild>
-                <AppText fontSize={18} style={{textAlign: 'left', marginLeft: 40, width: '100%', color: '#198289'}}> 
-                    Esqueci minha Senha 
+                <AppText style={{fontWeight: 'bold', fontSize: 26, marginBottom: 30}}> 
+                    Login 
                 </AppText>
-            </Link>
-            
-            
-            <Link href='/signUp' asChild>
-                <AppText fontSize={18} style={{textAlign: 'left', marginLeft: 40, marginTop: 10, width: '100%', color: '#198289'}}> Não tem cadastro ainda? Cadastre-se. </AppText>
-            </Link>
-            
-            
-            <Button 
-                label={isLoading ? 'Entrando...' : 'Entrar'}
-                onPress={ handleSubmit(handleLoginData) }
-            />
-        </View>
+
+                <AppText> E-mail </AppText>
+                <View style={{width: '90%'}}>
+                    <Controller
+                        control={control}
+                        name='email'
+                        render= {({field: {onChange, onBlur, value} }) => (
+                            <Input 
+                                style={{
+                                        shadowColor: '#000',
+                                        shadowOffset: { width: 0, height: 2 },
+                                        shadowOpacity: 0.05,
+                                        shadowRadius: 6,
+                                        elevation: 4,
+                                    }}
+                                placeholder=''
+                                onBlur={onBlur}
+                                onChangeText={onChange}
+                                value={value}
+                                keyboardType='email-address'
+                                autoCapitalize='none'
+                            />
+                        )}
+                    />
+                    {errors.email && <AppText>{errors.email.message}</AppText>}
+                </View>
+
+                <AppText> Senha </AppText>
+                <View style={{width: '90%'}}>
+                    <Controller
+                        control={control}
+                        name='password'
+                        render= {({field: {onChange, onBlur, value} }) => (
+                            <PasswordInput
+                                placeholder=''
+                                onBlur={onBlur}
+                                onChangeText={onChange}
+                                value={value}
+                            />    
+                        )}
+                    />
+                    {errors.password && <AppText>{errors.password.message}</AppText>}
+                </View>
+
+                <AppText>Ip da Caixa</AppText>
+                <View style={{width: '90%'}}>
+                    <Controller
+                        control={control}
+                        name='ipBox'
+                        render= {({field: {onChange, onBlur, value} }) => (
+                            <Input
+                                style={{
+                                        shadowColor: '#000',
+                                        shadowOffset: { width: 0, height: 2 },
+                                        shadowOpacity: 0.05,
+                                        shadowRadius: 6,
+                                        elevation: 4,
+                                    }} 
+                                placeholder=''
+                                onBlur={onBlur}
+                                onChangeText={onChange}
+                                value={value}
+                            />
+                        )}
+                    />
+                    {errors.ipBox && <AppText>{errors.ipBox.message}</AppText>}
+                </View>
+
+                <Link href='/esqueciSenha' asChild>
+                    <AppText fontSize={18} style={{textAlign: 'left', marginLeft: 40, width: '100%', color: '#198289'}}> 
+                        Esqueci minha Senha 
+                    </AppText>
+                </Link>
+                
+                
+                <Link href='/signUp' asChild>
+                    <AppText fontSize={18} style={{textAlign: 'left', marginLeft: 40, marginTop: 10, width: '100%', color: '#198289'}}> Não tem cadastro ainda? Cadastre-se. </AppText>
+                </Link>
+                
+                
+                <Button 
+                    label={isLoading ? 'Entrando...' : 'Entrar'}
+                    onPress={ handleSubmit(handleLoginData) }
+                />
+            </ScrollView>
+        </KeyboardAvoidingView>
     )
 }
 
