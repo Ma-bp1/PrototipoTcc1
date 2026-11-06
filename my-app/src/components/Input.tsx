@@ -12,6 +12,7 @@ export function Input({style, ...rest}: TextProps){
     return(
             <TextInput 
                 style={[styles.container, style]} {...rest}
+                placeholderTextColor='#999'
             />
     )
 }

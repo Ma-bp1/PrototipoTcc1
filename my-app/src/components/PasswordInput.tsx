@@ -11,7 +11,7 @@ export function PasswordInput({ style, ...rest }: TextInputProps) {
             <Input
                 {...rest}
                 secureTextEntry={!show}
-                //continue later!
+                placeholderTextColor="#999"
                 autoCapitalize='none'
                 style={[
                     styles.input,

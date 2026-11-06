@@ -12,7 +12,7 @@ import { auth } from '../../../config/firebaseConfig'
 import { Input } from '@/src/components/Input'
 import { AppText } from '@/src/components/AppText'
 import { loginSchema } from '@/src/schemas/authSchema'
-import { PasswordInput } from '@/src/components/passwordInput'
+import { PasswordInput } from '../../../components/PasswordInput'
 
 const db = getFirestore(auth.app)
 
