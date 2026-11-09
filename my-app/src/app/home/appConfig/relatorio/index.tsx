@@ -1,9 +1,23 @@
-import { useState } from 'react'
-import { View, ScrollView, TouchableOpacity, Text, StyleSheet } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import {
+    View,
+    ScrollView,
+    TouchableOpacity,
+    Text,
+    StyleSheet,
+    Platform,
+    Modal,
+    ActivityIndicator,
+    Alert,
+} from 'react-native'
 import { router } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
+import * as Print from 'expo-print'
+// Se seu Expo SDK for <= 53, troque por: import * as FileSystem from 'expo-file-system'
+import * as FileSystem from 'expo-file-system/legacy'
+import * as Sharing from 'expo-sharing'
 import { Button } from '../../../../components/Button'
-import { Input } from '../../../../components/Input'
 import { AppText } from '../../../../components/AppText'
 import { QuestionButton } from '../../../../components/QuestionButton'
 
@@ -16,21 +30,189 @@ const cores = {
     textoRelatorio: '#555555',
 }
 
-const RELATORIO_EXEMPLO = `Lorem ipsum dolor sit amet, consectetur adipiscing elit. In suscipit gravida magna non congue. Nunc vestibulum mauris vel ipsum lobortis, id imperdiet ex tristique. Phasellus dapibus at lectus vel aliquam. Nulla facilisi. Sed id nibh lorem. Pellentesque luctus turpis ac elit pulvinar, volutpat dapibus libero varius. Morbi molestie arcu non dui imperdiet vestibulum. Cras semper in lacus eget pulvinar. Praesent ac metus tempus, tempus nibh sit amet, venenatis est. Duis vel ullamcorper ex.
+type Campo = 'de' | 'ate'
 
-Suspendisse sed metus elementum, ultrices sapien sit, efficitur massa. Nullam felis neque, gravida id tortor et, feugiat consectetur lectus. Sed maximus porttitor dolor vel dictum. Integer mattis feugiat odio eu efficitur. Duis sit amet euismod metus, non molestie libero. Sed auctor felis enim, eu ullamcorper purus dignissim et.`
+// ---------- Helpers ----------
 
-export default function RelatorioUsoMedicamentoScreen({ navigation }: any) {
+const inicioDoDia = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+
+const formatarData = (d: Date) => {
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const aa = String(d.getFullYear()).slice(-2)
+    return `${dd}/${mm}/${aa}`
+}
+
+const dataParaArquivo = (d: Date) => {
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    return `${d.getFullYear()}${mm}${dd}`
+}
+
+const nomeDoArquivo = (de: Date, ate: Date) =>
+    `relatorio-uso_${dataParaArquivo(de)}_${dataParaArquivo(ate)}`
+
+const escapeHtml = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+// TODO: troque pelo cálculo/consulta real do relatório (API, banco local etc.)
+// Retorna o texto do relatório para o período informado.
+async function buscarRelatorio(_de: Date, _ate: Date): Promise<string> {
+    return ''
+}
+
+// HTML que será convertido em PDF pelo expo-print
+function montarHtml(de: Date, ate: Date, texto: string) {
+    return `
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <style>
+          body { font-family: Helvetica, Arial, sans-serif; padding: 24px; color: #333; }
+          h1 { color: ${cores.texto}; font-size: 22px; margin-bottom: 4px; }
+          h2 { font-size: 14px; font-weight: normal; color: #777; margin-top: 0; }
+          p { font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
+        </style>
+      </head>
+      <body>
+        <h1>Relatório de uso de medicamentos</h1>
+        <h2>Período: ${formatarData(de)} a ${formatarData(ate)}</h2>
+        <p>${escapeHtml(texto)}</p>
+      </body>
+    </html>`
+}
+
+// ---------- Tela ----------
+
+export default function RelatorioUsoMedicamentoScreen() {
     const [modalPremium, setModalPremium] = useState(false)
+
+    const hoje = inicioDoDia(new Date())
+    const [de, setDe] = useState(new Date(2026, 3, 1))
+    const [ate, setAte] = useState(new Date(2026, 3, 13))
+
+    const [relatorio, setRelatorio] = useState('')
+    const [carregando, setCarregando] = useState(false)
+    const [gerando, setGerando] = useState(false)
+
+    // iOS: picker aberto em modal
+    const [campoIOS, setCampoIOS] = useState<Campo | null>(null)
+    const [dataTemp, setDataTemp] = useState(hoje)
+
+    const requisicaoId = useRef(0)
 
     const irParaPremium = () => {
         setModalPremium(false)
         router.push('/premium') // ajuste para a rota real da tela Premium
     }
 
+    // Recalcula o relatório sempre que o período muda
+    useEffect(() => {
+        const id = ++requisicaoId.current
+        setCarregando(true)
+
+        buscarRelatorio(de, ate)
+            .then(texto => {
+                if (id !== requisicaoId.current) return // ignora resposta antiga
+                setRelatorio(texto)
+            })
+            .catch(() => {
+                if (id !== requisicaoId.current) return
+                setRelatorio('')
+                Alert.alert('Erro', 'Não foi possível calcular o relatório.')
+            })
+            .finally(() => {
+                if (id === requisicaoId.current) setCarregando(false)
+            })
+    }, [de, ate])
+
+    // Aplica a data escolhida mantendo "De" <= "A"
+    const aplicarData = (campo: Campo, valor: Date) => {
+        const d = inicioDoDia(valor)
+        if (campo === 'de') {
+            setDe(d)
+            if (d > ate) setAte(d)
+        } else {
+            setAte(d)
+            if (d < de) setDe(d)
+        }
+    }
+
+    const abrirPicker = (campo: Campo) => {
+        const valorAtual = campo === 'de' ? de : ate
+
+        if (Platform.OS === 'android') {
+            DateTimePickerAndroid.open({
+                value: valorAtual,
+                mode: 'date',
+                maximumDate: hoje,
+                onChange: (event, selecionada) => {
+                    if (event.type === 'set' && selecionada) aplicarData(campo, selecionada)
+                },
+            })
+        } else {
+            setDataTemp(valorAtual)
+            setCampoIOS(campo)
+        }
+    }
+
+    const confirmarIOS = () => {
+        if (campoIOS) aplicarData(campoIOS, dataTemp)
+        setCampoIOS(null)
+    }
+
+    // Gera o PDF em arquivo e entrega ao usuário:
+    // - Android: usuário escolhe a pasta (ex.: Downloads) e o PDF é gravado lá
+    // - iOS: abre a folha de compartilhamento ("Salvar em Arquivos", Imprimir, etc.)
+    const baixarPdf = async () => {
+        if (carregando || gerando) return
+        try {
+            setGerando(true)
+
+            const { uri } = await Print.printToFileAsync({
+                html: montarHtml(de, ate, relatorio),
+            })
+            const nome = nomeDoArquivo(de, ate)
+
+            if (Platform.OS === 'android') {
+                const saf = FileSystem.StorageAccessFramework
+                const permissao = await saf.requestDirectoryPermissionsAsync()
+                if (!permissao.granted) return // usuário cancelou
+
+                const base64 = await FileSystem.readAsStringAsync(uri, {
+                    encoding: FileSystem.EncodingType.Base64,
+                })
+                const destino = await saf.createFileAsync(
+                    permissao.directoryUri,
+                    nome,
+                    'application/pdf'
+                )
+                await FileSystem.writeAsStringAsync(destino, base64, {
+                    encoding: FileSystem.EncodingType.Base64,
+                })
+                Alert.alert('PDF salvo', 'O relatório foi salvo na pasta escolhida.')
+            } else {
+                // Renomeia o arquivo temporário para um nome legível
+                const novoUri = `${FileSystem.cacheDirectory}${nome}.pdf`
+                await FileSystem.moveAsync({ from: uri, to: novoUri })
+
+                if (await Sharing.isAvailableAsync()) {
+                    await Sharing.shareAsync(novoUri, {
+                        mimeType: 'application/pdf',
+                        UTI: 'com.adobe.pdf',
+                        dialogTitle: 'Salvar relatório',
+                    })
+                }
+            }
+        } catch (e) {
+            Alert.alert('Erro', 'Não foi possível gerar o PDF.')
+        } finally {
+            setGerando(false)
+        }
+    }
+
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
-
             <ScrollView
                 style={styles.conteudo}
                 contentContainerStyle={styles.conteudoInterno}
@@ -51,42 +233,81 @@ export default function RelatorioUsoMedicamentoScreen({ navigation }: any) {
                     Selecione entre um período:
                 </AppText>
 
-                <AppText style={[{fontSize: 12}, styles.ultimaExclusao]}>
+                <AppText style={[{ fontSize: 12 }, styles.ultimaExclusao]}>
                     Última exclusão em 12/03/26, 12:00
                 </AppText>
 
                 <View style={styles.linhaPeriodo}>
                     <AppText fontSize={18} style={styles.rotuloPeriodo}>De</AppText>
-                    <Input
+                    <TouchableOpacity
                         style={styles.campoData}
-                        defaultValue="01/04/26"
-                        textAlign="center"
-                    />
+                        activeOpacity={0.7}
+                        onPress={() => abrirPicker('de')}
+                    >
+                        <Text style={styles.campoDataTexto}>{formatarData(de)}</Text>
+                    </TouchableOpacity>
+
                     <AppText fontSize={18} style={styles.rotuloPeriodo}>A</AppText>
-                    <Input
+                    <TouchableOpacity
                         style={styles.campoData}
-                        defaultValue="13/04/26"
-                        textAlign="center"
-                    />
+                        activeOpacity={0.7}
+                        onPress={() => abrirPicker('ate')}
+                    >
+                        <Text style={styles.campoDataTexto}>{formatarData(ate)}</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Card do relatório */}
                 <View style={styles.card}>
                     <View style={styles.relatorioBox}>
-                        <AppText style={[{fontSize: 12}, styles.relatorioTexto]}>
-                            {RELATORIO_EXEMPLO}
-                        </AppText>
+                        {carregando ? (
+                            <ActivityIndicator color={cores.primaria} />
+                        ) : (
+                            // Área reservada para a visualização do relatório/PDF.
+                            // Quando tiver o conteúdo, renderize aqui (texto, WebView etc.)
+                            <View />
+                        )}
                     </View>
 
                     <Button
-                        label="Imprimir/Salvar"
+                        label={gerando ? 'Gerando...' : 'Imprimir/Salvar'}
                         variant="blue"
                         style={styles.botaoImprimir}
-                        onPress={() => setModalPremium(true)}
+                        onPress={baixarPdf}
                     />
                 </View>
             </ScrollView>
 
+            {/* Picker do iOS (o Android usa o diálogo nativo) */}
+            {Platform.OS === 'ios' && (
+                <Modal
+                    visible={campoIOS !== null}
+                    transparent
+                    animationType="slide"
+                    onRequestClose={() => setCampoIOS(null)}
+                >
+                    <View style={styles.modalFundo}>
+                        <View style={styles.modalCard}>
+                            <DateTimePicker
+                                value={dataTemp}
+                                mode="date"
+                                display="spinner"
+                                maximumDate={hoje}
+                                locale="pt-BR"
+                                onChange={(_, d) => d && setDataTemp(d)}
+                            />
+                            <View style={styles.modalBotoes}>
+                                <TouchableOpacity onPress={() => setCampoIOS(null)}>
+                                    <Text style={styles.modalCancelar}>Cancelar</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={confirmarIOS}>
+                                    <Text style={styles.modalConfirmar}>Confirmar</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
+            )}
         </SafeAreaView>
     )
 }
@@ -94,26 +315,11 @@ export default function RelatorioUsoMedicamentoScreen({ navigation }: any) {
 const styles = StyleSheet.create({
     safe: {
         flex: 1,
-
-    },
-    voltar: {
-        position: 'absolute',
-        left: 12,
-        top: 0,
-        bottom: 0,
-        width: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    voltarIcone: {
-        fontSize: 26,
-        color: cores.branco,
     },
     conteudo: {
         flex: 1,
         backgroundColor: cores.fundo,
     },
-    // Padding movido para cá para rolar junto com o conteúdo
     conteudoInterno: {
         paddingHorizontal: 16,
         paddingTop: 16,
@@ -128,7 +334,7 @@ const styles = StyleSheet.create({
     tituloPeriodo: {
         fontWeight: '600',
         marginBottom: 8,
-        paddingRight: 36, // espaço para o botão de ajuda
+        paddingRight: 36,
     },
     ultimaExclusao: {
         marginBottom: 12,
@@ -144,20 +350,19 @@ const styles = StyleSheet.create({
     rotuloPeriodo: {
         fontWeight: '600',
     },
-    // Sobrescreve o Input padrão (que é grande e cinza claro)
     campoData: {
         width: 110,
         height: 34,
-        marginTop: 0,
-        marginBottom: 0,
-        padding: 0,
         borderRadius: 8,
         backgroundColor: cores.campoData,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    campoDataTexto: {
         fontSize: 18,
         fontWeight: '600',
         color: cores.texto,
     },
-    // Sem flex: 1, o card cresce conforme o tamanho do relatório
     card: {
         backgroundColor: cores.branco,
         borderRadius: 30,
@@ -167,14 +372,13 @@ const styles = StyleSheet.create({
     },
     relatorioBox: {
         width: '100%',
+        minHeight: 320,
         backgroundColor: cores.fundo,
         borderRadius: 21,
         paddingVertical: 20,
         paddingHorizontal: 20,
-    },
-    relatorioTexto: {
-        color: cores.textoRelatorio,
-        lineHeight: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     botaoImprimir: {
         width: 'auto',
@@ -184,5 +388,33 @@ const styles = StyleSheet.create({
         paddingVertical: 0,
         marginTop: 12,
         marginBottom: 0,
+    },
+    // Modal do picker (iOS)
+    modalFundo: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        backgroundColor: 'rgba(0,0,0,0.35)',
+    },
+    modalCard: {
+        backgroundColor: cores.branco,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingTop: 12,
+        paddingBottom: 32,
+    },
+    modalBotoes: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 28,
+        marginTop: 8,
+    },
+    modalCancelar: {
+        fontSize: 16,
+        color: cores.textoRelatorio,
+    },
+    modalConfirmar: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: cores.primaria,
     },
 })
