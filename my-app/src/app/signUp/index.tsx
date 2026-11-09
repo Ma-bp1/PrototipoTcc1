@@ -3,7 +3,8 @@ import { useState } from 'react'
 import {Button} from '../../components/Button'
 import {Input} from '../../components/Input'
 import {AppText} from '../../components/AppText'
-import { useRouter } from 'expo-router'
+import { useRouter, Link } from 'expo-router'
+import { Checkbox } from 'expo-checkbox'
 
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -17,6 +18,7 @@ export default function signUp(){
 
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false)
+    const [isChecked, setChecked] = useState(false);
     
     const {control, handleSubmit, formState: {errors}} = useForm<SignUpData>({
         resolver: zodResolver(signUpSchema),
@@ -177,6 +179,21 @@ export default function signUp(){
                     {errors.ipBox && <AppText>{errors.ipBox.message}</AppText>}
                 </View>
 
+                <View style={{flex: 1, flexDirection: 'row', marginLeft: 50, marginRight: 30}}>
+                    <Checkbox
+                        style={{margin: 8}}
+                        value={isChecked}
+                        onValueChange={setChecked}
+                    />
+                    <Link href={'/politicaPrivacidade'}>
+                        <AppText fontSize={18}>
+                            Concordo com a política de segurança e termos de uso do Chronomedi.
+                        </AppText>
+                    </Link>
+                    
+                </View>
+                
+                
                 <Button
                     label={isLoading ? 'Aguarde...' : 'Cadastrar'}
                     onPress={ handleSubmit(handleSignUpData) }

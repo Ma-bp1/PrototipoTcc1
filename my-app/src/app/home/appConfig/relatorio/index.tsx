@@ -14,12 +14,12 @@ import { router } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import * as Print from 'expo-print'
-// Se seu Expo SDK for <= 53, troque por: import * as FileSystem from 'expo-file-system'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
 import { Button } from '../../../../components/Button'
 import { AppText } from '../../../../components/AppText'
 import { QuestionButton } from '../../../../components/QuestionButton'
+import { gerarRelatorio } from '../../../../services/reportService'
 
 const cores = {
     primaria: '#2DB5B0',
@@ -55,12 +55,6 @@ const nomeDoArquivo = (de: Date, ate: Date) =>
 const escapeHtml = (s: string) =>
     s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-// TODO: troque pelo cálculo/consulta real do relatório (API, banco local etc.)
-// Retorna o texto do relatório para o período informado.
-async function buscarRelatorio(_de: Date, _ate: Date): Promise<string> {
-    return ''
-}
-
 // HTML que será convertido em PDF pelo expo-print
 function montarHtml(de: Date, ate: Date, texto: string) {
     return `
@@ -95,8 +89,6 @@ export default function RelatorioUsoMedicamentoScreen() {
     const [carregando, setCarregando] = useState(false)
     const [gerando, setGerando] = useState(false)
 
-    // iOS: picker aberto em modal
-    const [campoIOS, setCampoIOS] = useState<Campo | null>(null)
     const [dataTemp, setDataTemp] = useState(hoje)
 
     const requisicaoId = useRef(0)
@@ -111,7 +103,7 @@ export default function RelatorioUsoMedicamentoScreen() {
         const id = ++requisicaoId.current
         setCarregando(true)
 
-        buscarRelatorio(de, ate)
+        gerarRelatorio(de, ate)
             .then(texto => {
                 if (id !== requisicaoId.current) return // ignora resposta antiga
                 setRelatorio(texto)
@@ -152,14 +144,11 @@ export default function RelatorioUsoMedicamentoScreen() {
             })
         } else {
             setDataTemp(valorAtual)
-            setCampoIOS(campo)
+            
         }
     }
 
-    const confirmarIOS = () => {
-        if (campoIOS) aplicarData(campoIOS, dataTemp)
-        setCampoIOS(null)
-    }
+    
 
     // Gera o PDF em arquivo e entrega ao usuário:
     // - Android: usuário escolhe a pasta (ex.: Downloads) e o PDF é gravado lá
@@ -261,11 +250,11 @@ export default function RelatorioUsoMedicamentoScreen() {
                 <View style={styles.card}>
                     <View style={styles.relatorioBox}>
                         {carregando ? (
-                            <ActivityIndicator color={cores.primaria} />
+                            <ActivityIndicator color={cores.primaria} style={styles.carregando} />
                         ) : (
-                            // Área reservada para a visualização do relatório/PDF.
-                            // Quando tiver o conteúdo, renderize aqui (texto, WebView etc.)
-                            <View />
+                            <AppText style={[{ fontSize: 12 }, styles.relatorioTexto]}>
+                                {relatorio}
+                            </AppText>
                         )}
                     </View>
 
@@ -277,37 +266,6 @@ export default function RelatorioUsoMedicamentoScreen() {
                     />
                 </View>
             </ScrollView>
-
-            {/* Picker do iOS (o Android usa o diálogo nativo) */}
-            {Platform.OS === 'ios' && (
-                <Modal
-                    visible={campoIOS !== null}
-                    transparent
-                    animationType="slide"
-                    onRequestClose={() => setCampoIOS(null)}
-                >
-                    <View style={styles.modalFundo}>
-                        <View style={styles.modalCard}>
-                            <DateTimePicker
-                                value={dataTemp}
-                                mode="date"
-                                display="spinner"
-                                maximumDate={hoje}
-                                locale="pt-BR"
-                                onChange={(_, d) => d && setDataTemp(d)}
-                            />
-                            <View style={styles.modalBotoes}>
-                                <TouchableOpacity onPress={() => setCampoIOS(null)}>
-                                    <Text style={styles.modalCancelar}>Cancelar</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity onPress={confirmarIOS}>
-                                    <Text style={styles.modalConfirmar}>Confirmar</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </View>
-                </Modal>
-            )}
         </SafeAreaView>
     )
 }
@@ -377,8 +335,13 @@ const styles = StyleSheet.create({
         borderRadius: 21,
         paddingVertical: 20,
         paddingHorizontal: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
+    },
+    carregando: {
+        alignSelf: 'center',
+    },
+    relatorioTexto: {
+        color: cores.textoRelatorio,
+        lineHeight: 18,
     },
     botaoImprimir: {
         width: 'auto',

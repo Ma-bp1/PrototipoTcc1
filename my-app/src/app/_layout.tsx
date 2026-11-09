@@ -44,6 +44,9 @@ export default function Layout() {
                 <Stack.Screen 
                     name='esqueciSenha/index' options={{headerShown: false}}
                 />
+                <Stack.Screen 
+                    name='politicaPrivacidade' options={{headerShown: false}}
+                />
             </Stack>
         </GestureHandlerRootView>
     );

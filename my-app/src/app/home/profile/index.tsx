@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, Alert, Image, Pressable, ScrollView, KeyboardTy
 import { Feather } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
-import { onAuthStateChanged, signOut, updatePassword } from 'firebase/auth'
-import { doc, getDoc, getFirestore, setDoc } from 'firebase/firestore'
+import { onAuthStateChanged, signOut, updatePassword, getAuth } from 'firebase/auth'
+import { doc, getDoc, getFirestore, setDoc, deleteDoc } from 'firebase/firestore'
 import { z } from 'zod'
 
 import { Button } from '../../../components/Button'
@@ -283,6 +283,66 @@ export default function Profile() {
         }
     }
 
+    function confirmDelete(){
+        Alert.alert(
+            "Excluir Conta",
+            "Tem certeza de que deseja excluir sua conta? Esta ação é irreversível e todos os seus dados serão perdidos.",
+            [
+                {
+                    text: "Cancelar",
+                    style: "cancel" 
+                },
+                {
+                    text: "Excluir",
+                    style: "destructive", 
+                    onPress: () => handleDelete() 
+                }
+            ],
+            { cancelable: true } // Permite fechar o alerta clicando fora dele 
+        );
+    }
+
+    async function handleDelete(){
+        try {
+            const auth = getAuth();
+            const db = getFirestore();
+            const user = auth.currentUser;
+
+            if (!user) throw new Error("Nenhum usuário logado.");
+
+            // Deleta do Firestore
+            await deleteDoc(doc(db, 'users', user.uid));
+
+            // Deleta do Auth
+            await user.delete();
+
+            router.replace('/welcome')
+
+        } catch (error: any) {
+            console.error('Erro ao deletar:', error);
+
+            // Corrigido de 'auth?requires-recent-login' para 'auth/requires-recent-login'
+            if (error.code === 'auth/requires-recent-login') {
+                Alert.alert(
+                    "Sessão Expirada",
+                    "Por motivos de segurança, por favor faça login novamente para confirmar a exclusão da sua conta.",
+                    [ // <--- Aqui faltava a vírgula antes deste array!
+                        {
+                            text: 'OK',
+                            onPress: async () => {
+                                // Como estamos no modular, usamos signOut(auth) em vez de auth().signOut()
+                                await signOut(auth);
+
+                                router.navigate('/login');
+                            }
+                        }
+                    ]
+                );
+            } else {
+                Alert.alert('Erro', error.message);
+            }
+        }
+    }
     // Valor exibido no campo atual (a senha nunca é exibida)
     function displayValue(field: FieldKey) {
         return field === 'password' ? '*********' : data[field]
@@ -328,8 +388,9 @@ export default function Profile() {
             </View>
 
             <View style={styles.buttons}>
-                <Button label="Assinar Premium" variant="red" onPress={() => Alert.alert('Em breve!')} />
+                <Button label="Assinar Premium" variant="red" onPress={() => Alert.alert('Essa conta já possui premium.')} />
                 <Button label="Sair da Conta" variant="red" onPress={handleLogout} />
+                <Button label='Excluir conta permanentemente' variant='red' onPress={confirmDelete} />
             </View>
         </ScrollView>
     )
