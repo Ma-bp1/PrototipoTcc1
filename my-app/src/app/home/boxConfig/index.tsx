@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { View, ScrollView, Switch, StyleSheet } from 'react-native'
+import { View, ScrollView, Switch, StyleSheet, TextInput } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Button } from '../../../components/Button'
 import { AppText } from '../../../components/AppText'
+import { useBox } from '../../../hooks/useBox'
 
 const cores = {
     primaria: '#2DB5B0',
@@ -16,6 +17,8 @@ const cores = {
 
 export default function BoxConfigScreen() {
     const [notificar, setNotificar] = useState(false)
+    const [codigo, setCodigo] = useState('')
+    const { box, online, ultimaSync, carregando, vincular, sincronizar } = useBox()
 
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
@@ -24,9 +27,32 @@ export default function BoxConfigScreen() {
                 contentContainerStyle={styles.conteudoInterno}
                 showsVerticalScrollIndicator={false}
             >
-                
-                <AppText style={styles.tituloSecao}>Configurações Gerais</AppText>
+                {!box && (
+                    <View style={styles.card}>
+                        <AppText style={styles.rotulo}>Código da caixa (aparece no Monitor Serial)</AppText>
+                        <TextInput
+                            value={codigo}
+                            onChangeText={setCodigo}
+                            autoCapitalize="characters"
+                            placeholder="A0B1C2D3E4F5"
+                            style={{ backgroundColor: cores.pill, borderRadius: 8, padding: 10, marginVertical: 12 }}
+                        />
+                        <Button label={carregando ? 'Vinculando...' : 'Vincular caixa'} variant="blue" onPress={() => vincular(codigo)} />
 
+                        <AppText style={styles.tituloSecao}>Configurações Gerais</AppText>
+
+                        <View style={[styles.bolinha, !online && { backgroundColor: '#B3B3B3' }]} />
+                        <AppText style={styles.pillTexto}>{online ? 'Ligada' : 'Desligada'}</AppText>
+
+                        <Button label={carregando ? 'Sincronizando...' : 'Sincronizar'} variant="blue"
+                                style={styles.botaoSincronizar} onPress={sincronizar} />
+
+                        <AppText style={styles.ultimaSync}>
+                            {ultimaSync ? `Última sincronização feita em ${ultimaSync}` : 'Ainda não sincronizada'}
+                        </AppText>
+                    </View>
+                )}
+                
                 <View style={styles.card}>
         
                     <View style={styles.linha}>
