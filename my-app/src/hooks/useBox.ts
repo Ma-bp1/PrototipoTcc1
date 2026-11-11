@@ -28,14 +28,14 @@ function montarAgenda(meds: Medication[]) {
         const rep = med.medRepetitions
 
         if (rep.type === 'horario') {
-            // de N em N horas a partir do horário cadastrado, dentro de 24h
             const inicio = h * 60 + m
             const passo = Math.round(rep.intervalHours * 60)
-            if (!passo || passo <= 0)
+            if (!passo || passo <= 0) continue   // <- faltava isso
+
             for (let t = inicio; t < inicio + 1440; t += passo) {
                 const x = t % 1440
                 agenda.push({ ...base, h: Math.floor(x / 60), m: x % 60 })
-            }
+        }
         } else if (rep.type === 'semanal') {
             // w = dias da semana (0 = domingo), a caixa só dispara nesses dias
             agenda.push({ ...base, h, m, w: rep.daysOfWeek })
