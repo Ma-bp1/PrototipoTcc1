@@ -4,6 +4,7 @@ import { Alert } from 'react-native';
 import type { Medication } from '../schemas/medSchema';
 import { confirmDoseInDb, snoozeDoseInDb } from '../services/doseService';
 import { cancelSnooze, snoozeMedication } from '../notifications/scheduler';
+import { enviarAgendaParaCaixa } from './useBox';
 
 const SNOOZE_MINUTES = 5;
 
@@ -45,7 +46,12 @@ export function useDoseActions(
             await cancelSnooze(medId) // evita o aviso adiado tocar depois de confirmar
 
             atualizarLocal(medId, { ...novos, medSnoozedUntil: undefined })
-        })
+
+            // Fire-and-forget: a dose já foi confirmada, não vale travar nem avisar erro aqui
+            enviarAgendaParaCaixa().catch((e) =>
+                console.warn('Falha ao enviar agenda para a caixa', e),
+            )
+    })
 
     // Agora também agenda o aviso. Assinatura mudou: recebe doseMs e minutos (em vez de adiadaAteMs).
     const adiarDose = (medId: string, doseMs: number, minutos = SNOOZE_MINUTES) =>

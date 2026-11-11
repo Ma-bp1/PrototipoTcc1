@@ -33,6 +33,7 @@ export default function BoxConfigScreen() {
                         <TextInput
                             value={codigo}
                             onChangeText={setCodigo}
+                            placeholderTextColor='#999'
                             autoCapitalize="characters"
                             placeholder="A0B1C2D3E4F5"
                             style={{ backgroundColor: cores.pill, borderRadius: 8, padding: 10, marginVertical: 12 }}
@@ -52,43 +53,6 @@ export default function BoxConfigScreen() {
                         </AppText>
                     </View>
                 )}
-                
-                <View style={styles.card}>
-        
-                    <View style={styles.linha}>
-                        <AppText style={styles.rotulo}>Status da Caixa:</AppText>
-                        <View style={styles.colunaValor}>
-                            <View style={styles.pill}>
-                                <View style={styles.bolinha} />
-                                <AppText style={styles.pillTexto}>Ligada</AppText>
-                            </View>
-                        </View>
-                    </View>
-
-              
-                    <View style={styles.linha}>
-                        <AppText style={styles.rotulo}>Bateria:</AppText>
-                        <View style={styles.colunaValor}>
-                            <View style={styles.pill}>
-                                <View style={styles.bateria} />
-                                <AppText style={styles.pillTexto}>100%</AppText>
-                            </View>
-                        </View>
-                    </View>
-
-                    <Button
-                        label="Sincronizar"
-                        variant="blue"
-                        style={styles.botaoSincronizar}
-                    />
-
-                    <AppText style={styles.ultimaSync}>
-                        Última sincronização feita em 08/04/2026
-                    </AppText>
-
-                    <View style={styles.divisor} />
-                </View>
-
              
                 <AppText style={styles.tituloSecao}>Notificações</AppText>
 

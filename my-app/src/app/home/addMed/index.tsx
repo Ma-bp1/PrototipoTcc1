@@ -17,6 +17,7 @@ import { scheduleMedication } from '../../../../src/notifications/scheduler'
 
 import { getAlertSettings } from '../../../services/alertSettings'
 import { loadMedications, findConflicts, confirmConflicts } from '../../../services/conflicts'
+import { enviarAgendaParaCaixa } from '@/src/hooks/useBox'
 
 const DAYS = [
   { label: 'D', value: 0 },
@@ -42,6 +43,18 @@ function getTimes(data: MedData): string[] {
         times.push(`${String(h % 24).padStart(2, '0')}:${mm}`);
     }
     return times;
+}
+
+type ResultadoCaixa = 'enviada' | 'sem-caixa' | 'erro'
+
+async function sincronizarCaixa(): Promise<ResultadoCaixa> {
+    try {
+        const ok = await enviarAgendaParaCaixa()
+        return ok ? 'enviada' : 'sem-caixa'
+    } catch (e) {
+        console.warn('Falha ao enviar agenda para a caixa', e)
+        return 'erro'
+    }
 }
 
 
@@ -110,6 +123,12 @@ export default function AddMed(){
 
     const currentRepetition = watch('medRepetitions')
 
+    function mensagemCaixa(r: ResultadoCaixa) {
+        if (r === 'enviada') return 'Agenda enviada para a caixa.'
+        if (r === 'erro') return 'Salvo, mas não foi possível enviar à caixa. Use "Sincronizar" depois.'
+        return undefined // sem caixa vinculada: não precisa avisar
+    }
+
     const onSubmit = async (data: MedData) => {
         setIsLoading(true)
         try {
@@ -138,8 +157,9 @@ export default function AddMed(){
                 });
 
                 await agendarNotificacoes(medicineId!, data);
+                const caixa = await sincronizarCaixa();
 
-                Alert.alert('Medicamento atualizado com sucesso.');
+                Alert.alert('Medicamento atualizado com sucesso.', mensagemCaixa(caixa));
                 router.back();
             } else {
                 const docRef = await addDoc(collection(db, 'users', userId, 'medications'), {
@@ -148,10 +168,12 @@ export default function AddMed(){
                 });
 
                 await agendarNotificacoes(docRef.id, data);
+                const caixa = await sincronizarCaixa();
 
-                Alert.alert('Medicamento cadastrado com sucesso.');
+                Alert.alert('Medicamento cadastrado com sucesso.', mensagemCaixa(caixa));
                 router.push('/home');
             }
+
         } catch (error) {
             console.error('Erro ao salvar medicamento no Firestore:', error)
             Alert.alert('Não foi possível salvar o medicamento.')
