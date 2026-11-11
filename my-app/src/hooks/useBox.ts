@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Alert } from 'react-native'
 import { collection, doc, getDoc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore'
 import { auth, db } from '../config/firebaseConfig'
 import { getMedications } from '../services/medicationService' // AJUSTE só se o nome do arquivo for outro
 import { Medication } from '../schemas/medSchema'
+import { onAuthStateChanged } from 'firebase/auth'
+
+type DoseConfirmada = { slot: number; horario: number } // horario em segundos (unixtime)
 
 // Transforma os medicamentos no formato que a caixa entende.
 // Cada item = um horário de alarme:
@@ -63,29 +66,75 @@ export async function enviarAgendaParaCaixa() {
     return true
 }
 
-export function useBox() {
+export function useBox(onDoseConfirmada?: (dose: DoseConfirmada) => void) {
     const [box, setBox] = useState<any>(null) // null = nenhuma caixa vinculada
     const [carregando, setCarregando] = useState(false)
     const [, forcar] = useState(0)
 
+    const ultimaDoseProcessada = useRef<number | null>(null)
+
+    const callbackRef = useRef(onDoseConfirmada)
+    callbackRef.current = onDoseConfirmada
+
     // Acha a caixa que pertence a este usuário e acompanha em tempo real
     useEffect(() => {
-        const uid = auth.currentUser?.uid
-        if (!uid) return
-        const q = query(collection(db, 'boxes'), where('ownerUid', '==', uid))
-        const parar = onSnapshot(
-            q,
-            snap => {
-                const d = snap.docs[0]
-                setBox(d ? { id: d.id, ...d.data() } : null)
-            },
-            err => console.log('Erro ao ler caixa:', err)
-        )
-        const timer = setInterval(() => forcar(n => n + 1), 30000) // reavalia "online"
+        let parar: (() => void) | null = null
+
+        const sair = onAuthStateChanged(auth, user => {
+            // troca de usuário: limpa o listener anterior
+            parar?.()
+            parar = null
+            ultimaDoseProcessada.current = null
+
+            if (!user) {
+                setBox(null)
+                return
+            }
+
+            const q = query(collection(db, 'boxes'), where('ownerUid', '==', user.uid))
+            parar = onSnapshot(
+                q,
+                snap => {
+                    const d = snap.docs[0]
+                    if (!d) {
+                        setBox(null)
+                        return
+                    }
+
+                    const data = d.data()
+                    setBox({ id: d.id, ...data })
+
+                    const horario = Number(data.ultimaDoseHorario) || 0
+                    const slot = Number(data.ultimaDoseSlot)
+
+                    // Primeiro snapshot: só registra o que já existe
+                    if (ultimaDoseProcessada.current === null) {
+                        ultimaDoseProcessada.current = horario
+                        return
+                    }
+
+                    if (
+                        data.ultimaDoseConfirmada === true &&
+                        slot > 0 &&
+                        horario > ultimaDoseProcessada.current
+                    ) {
+                        ultimaDoseProcessada.current = horario
+                        callbackRef.current?.({ slot, horario })
+                    }
+                },
+                err => console.log('Erro ao ler caixa:', err)
+            )
+        })
+
         return () => {
-            parar()
-            clearInterval(timer)
+            parar?.()
+            sair()
         }
+    }, [])
+
+    useEffect(() => {
+        const t = setInterval(() => forcar(n => n + 1), 30000)
+        return () => clearInterval(t)
     }, [])
 
     // Caixa manda sinal a cada 30s; sem sinal há 2 min = desligada

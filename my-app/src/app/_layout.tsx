@@ -1,12 +1,30 @@
-import { Stack, router } from 'expo-router';
-import { useEffect } from 'react';
+import { Stack, router, usePathname } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { setupNotifications } from '../notifications/setup';
 import { getNotifications } from '../notifications/native';
+import { useBox } from '../hooks/useBox';
+import { confirmarDosePelaCaixa } from '../services/doseActions';
 
 const semHeader = ['index', 'welcome', 'login', 'signUp', 'home'];
 
 export default function Layout() {
+    const pathname = usePathname()
+
+    const pathnameRef = useRef(pathname)
+    useEffect(() => {
+        pathnameRef.current = pathname
+    }, [pathname])
+
+    useBox(async ({ slot, horario }) => {
+        await confirmarDosePelaCaixa(slot, horario);
+
+        if (pathnameRef.current.includes('doseAlert')) {
+            if (router.canGoBack()) router.back();
+            else router.replace('/home');
+        }
+    });
+
     useEffect(() => {
         const N = getNotifications();
         if (!N) return; // build sem o módulo: o app abre normalmente
