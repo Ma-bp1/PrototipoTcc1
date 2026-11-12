@@ -26,12 +26,15 @@ export const medSchema = z.object({
     medAdminRoute: z.string(),
     medDesc: z.string(),
     medIcon: z.string(),
+    medPhoto: z.string().nullable().optional(),
+    medIconColor: z.string().optional(),
     medLastConfirmed: z.number().optional(),
     medSnoozedUntil: z.number().optional(),
     medLastMissed: z.number().optional(),
     medAutoSnooze: z
         .object({doseMs: z.number(), count: z.number() })
         .optional(),
+    
 })
 
 export type MedData = z.infer<typeof medSchema>

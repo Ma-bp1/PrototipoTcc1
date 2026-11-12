@@ -1,11 +1,11 @@
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Alert, ActivityIndicator} from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Switch, Pressable, ScrollView, Alert, ActivityIndicator, Image } from 'react-native'
 import { Input } from '../../../components/Input'
 import { AppText } from '../../../components/AppText'
 import TimePicker from '../../../components/TimePicker'
 import { NumberStepper } from '../../../components/NumberStepper'
 import { CustomDropdown } from '../../../components/CustomDropDown'
 import { Button } from '../../../components/Button'
-import { useForm, Controller } from 'react-hook-form'
+import { useForm, Controller, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { medSchema, type MedData } from '../../../schemas/medSchema'
 import { useState, useEffect } from 'react'
@@ -18,6 +18,10 @@ import { scheduleMedication } from '../../../../src/notifications/scheduler'
 import { getAlertSettings } from '../../../services/alertSettings'
 import { loadMedications, findConflicts, confirmConflicts } from '../../../services/conflicts'
 import { enviarAgendaParaCaixa } from '@/src/hooks/useBox'
+import { MedIconKey } from '@/src/components/MedIcons'
+import { DEFAULT_ICON_COLOR, IconPicker } from '@/src/components/IconPicker'
+
+import { pickSmallPhoto } from '@/src/utils/pickSmallPhoto'
 
 const DAYS = [
   { label: 'D', value: 0 },
@@ -76,9 +80,13 @@ export default function AddMed(){
             medStockConsumption: 0, 
             medAdminRoute: '', 
             medDesc: '', 
-            medIcon: ''
+            medIcon: 'pill-round',
+            medPhoto: null,
+            medIconColor: DEFAULT_ICON_COLOR,
         }   
     })
+
+    const medPhoto = watch('medPhoto')
 
     async function agendarNotificacoes(id: string, data: MedData) {
         try {
@@ -406,6 +414,63 @@ export default function AddMed(){
                         />
                         {errors.medName && <AppText>{errors.medName.message}</AppText>}
                     </View>
+
+                    <AppText> Ícone: </AppText>
+
+                    <Controller
+                        control={control}
+                        name="medPhoto"
+                        render={({ field: { value, onChange } }) => (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                {value ? (
+                                    <Image
+                                        source={{ uri: value }}
+                                        style={{ width: 48, height: 48, borderRadius: 8 }}
+                                    />
+                                ) : null}
+
+                                <Pressable
+                                    onPress={async () => {
+                                        const uri = await pickSmallPhoto()
+                                        if (uri) onChange(uri)
+                                    }}
+                                >
+                                    <AppText style={{ fontSize: 13, color: '#1B7F74' }}>
+                                        Escolher imagem da galeria...
+                                    </AppText>
+                                </Pressable>
+
+                                {value ? (
+                                    <Pressable onPress={() => onChange(null)}>
+                                        <AppText style={{ fontSize: 13, color: '#B00020' }}>Remover</AppText>
+                                    </Pressable>
+                                ) : null}
+                            </View>
+                        )}
+                    />
+
+                    <Controller
+                        control={control}
+                        name="medIcon"
+                        render={({ field: { value, onChange } }) => (
+                            <Controller
+                            control={control}
+                            name="medIconColor"
+                            render={({ field: { value: color, onChange: onColor } }) => (
+                                <IconPicker
+                                    icon={value as MedIconKey}
+                                    color={color ?? DEFAULT_ICON_COLOR}
+                                    hasPhoto={!!medPhoto}
+                                    onChangeIcon={(i) => {
+                                        onChange(i)
+                                        setValue('medPhoto', null) // Limpa a foto se o usuário escolher um ícone   
+                                    }}
+                                    onChangeColor={onColor}
+                                />
+                            )}
+                            />
+                        )}
+                    />
 
                     <Button 
                         style={{marginBottom: 130}} 
