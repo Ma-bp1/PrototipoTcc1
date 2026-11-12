@@ -28,6 +28,10 @@ export const medSchema = z.object({
     medIcon: z.string(),
     medLastConfirmed: z.number().optional(),
     medSnoozedUntil: z.number().optional(),
+    medLastMissed: z.number().optional(),
+    medAutoSnooze: z
+        .object({doseMs: z.number(), count: z.number() })
+        .optional(),
 })
 
 export type MedData = z.infer<typeof medSchema>

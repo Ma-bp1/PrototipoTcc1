@@ -5,6 +5,7 @@ import { setupNotifications } from '../notifications/setup';
 import { getNotifications } from '../notifications/native';
 import { useBox } from '../hooks/useBox';
 import { confirmarDosePelaCaixa } from '../services/doseActions';
+import { useMissedDoseAlert } from '../hooks/useMissedDoseAlert';
 
 const semHeader = ['index', 'welcome', 'login', 'signUp', 'home'];
 
@@ -24,6 +25,8 @@ export default function Layout() {
             else router.replace('/home');
         }
     });
+
+    useMissedDoseAlert();
 
     useEffect(() => {
         const N = getNotifications();

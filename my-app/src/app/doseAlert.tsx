@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { View, Text, Pressable, Vibration, StyleSheet, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,12 +6,13 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { doc, getDoc } from 'firebase/firestore';
 
 import { auth, db } from '../config/firebaseConfig';
-import { snoozeMedication, cancelSnooze } from '../notifications/scheduler';
 import { getAlertSettings } from '../services/alertSettings';
-import { confirmDoseInDb, snoozeDoseInDb } from '../services/doseService';
 import type { MedData } from '../schemas/medSchema';
+import { useDoseActions } from '../hooks/useDoseActions';
 
 const SNOOZE_MINUTES = 5;
+const MAX_AUTO_SNOOZES = 3;
+const AUTO_TIMEOUT_MS = 120_000; //2 min sem resposta
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 // Documento do Firestore = MedData (mesmo schema do AddMed)
@@ -84,6 +85,13 @@ export default function DoseAlert() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
+  const medList = useMemo(
+    () => (med && medId ? [{ ...med, id: medId }] : []),
+    [med, medId],
+  )
+
+  const { confirmarDose, adiarDose, marcarPerdida } = useDoseActions(medList, () => {})
+
   useEffect(() => {
     if (!medId) {
       setLoading(false);
@@ -148,39 +156,39 @@ export default function DoseAlert() {
     };
   }, [loading, jaTratada]);
 
+  useEffect(() => {
+    if (loading || jaTratada || busy) return;
+    const t = setTimeout(handleAutoTimeout, AUTO_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [loading, jaTratada, busy, med]);
+
   const handleConfirm = async () => {
-    if (busy) return;
+    if (busy || !medId) return;
     setBusy(true);
-    try {
-      if (medId && med) {
-        await cancelSnooze(medId);
-        await withTimeout(confirmDoseInDb(medId, med, doseMs));
-      }
-    } catch (e) {
-      console.warn('Falha ao registrar dose', e);
-    } finally {
-      leave();
-    }
+    await withTimeout(confirmarDose(medId, doseMs)); // manda a agenda para a caixa
+    leave();
   };
 
   const handleSnooze = async () => {
-    if (busy) return;
+    if (busy || !medId) return;
     setBusy(true);
-    try {
-      if (medId && med) {
-        const untilMs = await snoozeMedication({
-          id: medId,
-          name: med.medName,
-          doseMs,
-          minutes: SNOOZE_MINUTES,
-        });
-        await withTimeout(snoozeDoseInDb(medId, untilMs));
-      }
-    } catch (e) {
-      console.warn('Falha ao adiar', e);
-    } finally {
-      leave();
+    await withTimeout(adiarDose(medId, doseMs, SNOOZE_MINUTES)); // manual → zera contador
+    leave();
+  };
+
+  const handleAutoTimeout = async () => {
+    if (busy || !medId || !med) return;
+    setBusy(true);
+
+    const anterior = med.medAutoSnooze?.doseMs === doseMs ? med.medAutoSnooze.count : 0;
+    const count = anterior + 1;
+
+    if (count >= MAX_AUTO_SNOOZES) {
+      await withTimeout(marcarPerdida(medId, doseMs));
+    } else {
+      await withTimeout(adiarDose(medId, doseMs, SNOOZE_MINUTES, { doseMs, count }));
     }
+    leave();
   };
 
   const displayTime = doseMsParam

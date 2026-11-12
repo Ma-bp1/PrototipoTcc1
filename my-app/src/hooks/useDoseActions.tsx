@@ -5,6 +5,7 @@ import type { Medication } from '../schemas/medSchema';
 import { confirmDoseInDb, snoozeDoseInDb } from '../services/doseService';
 import { cancelSnooze, snoozeMedication } from '../notifications/scheduler';
 import { enviarAgendaParaCaixa } from './useBox';
+import { missDoseInDb } from '../services/doseService';
 
 const SNOOZE_MINUTES = 5;
 
@@ -42,10 +43,10 @@ export function useDoseActions(
             const med = medications.find((m) => m.id === medId)
             if (!med) return
 
-            const novos = await confirmDoseInDb(medId, med, doseMs)
             await cancelSnooze(medId) // evita o aviso adiado tocar depois de confirmar
+            const novos = await confirmDoseInDb(medId, med, doseMs)
 
-            atualizarLocal(medId, { ...novos, medSnoozedUntil: undefined })
+            atualizarLocal(medId, { ...novos, medSnoozedUntil: undefined, medAutoSnooze: undefined})
 
             // Fire-and-forget: a dose já foi confirmada, não vale travar nem avisar erro aqui
             enviarAgendaParaCaixa().catch((e) =>
@@ -53,8 +54,12 @@ export function useDoseActions(
             )
     })
 
-    // Agora também agenda o aviso. Assinatura mudou: recebe doseMs e minutos (em vez de adiadaAteMs).
-    const adiarDose = (medId: string, doseMs: number, minutos = SNOOZE_MINUTES) =>
+    const adiarDose = (
+        medId: string,
+        doseMs: number,
+        minutos = SNOOZE_MINUTES,
+        auto?: { doseMs: number; count: number }
+    ) =>
         executar(medId, 'Não foi possível adiar a dose.', async () => {
             const med = medications.find((m) => m.id === medId)
             if (!med) return
@@ -65,10 +70,25 @@ export function useDoseActions(
                 doseMs,
                 minutes: minutos,
             })
-            await snoozeDoseInDb(medId, adiadaAteMs)
+            await snoozeDoseInDb(medId, adiadaAteMs, auto)
 
-            atualizarLocal(medId, { medSnoozedUntil: adiadaAteMs })
+            atualizarLocal(medId, { medSnoozedUntil: adiadaAteMs, medAutoSnooze: auto })
         })
 
-    return { confirmarDose, adiarDose }
+    const marcarPerdida = (medId: string, doseMs: number) =>
+    executar(medId, 'Não foi possível registrar a dose perdida.', async () => {
+        const med = medications.find((m) => m.id === medId)
+        if (!med) return
+
+        await cancelSnooze(medId)
+        await missDoseInDb(medId, med, doseMs)
+
+        atualizarLocal(medId, {
+            medLastMissed: doseMs,
+            medSnoozedUntil: undefined,
+            medAutoSnooze: undefined,
+        })
+    })
+
+    return { confirmarDose, adiarDose, marcarPerdida }
 }
