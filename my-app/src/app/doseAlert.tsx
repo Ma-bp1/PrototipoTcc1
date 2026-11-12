@@ -181,6 +181,8 @@ export default function DoseAlert() {
     leave();
   };
 
+  const slotNumber = (slot: string) => slot.replace(/\D/g, '');
+
   const handleSkip = () => {
     if (busy || !medId) return;
     setBusy(true);
@@ -258,7 +260,7 @@ export default function DoseAlert() {
                 )}
                 {!!med.medAdminRoute && <InfoRow label="Via" value={med.medAdminRoute} />}
                 {!!med.medSlot && (
-                  <InfoRow label="Compartimento" value={`Slot ${med.medSlot}`} />
+                  <InfoRow label="Compartimento" value={`Slot ${slotNumber(med.medSlot)}`} />
                 )}
                 {!!repeatLabel && <InfoRow label="Repetição" value={repeatLabel} />}
               </View>
