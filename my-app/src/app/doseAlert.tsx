@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { View, Text, Pressable, Vibration, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, Vibration, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -130,6 +130,10 @@ export default function DoseAlert() {
   const jaConfirmada =
   !!med?.medLastConfirmed && Number(med.medLastConfirmed) >= doseMs;
 
+  //Já marcada como perdida/não administrada?
+  const jaPerdida =
+    !!med?.medLastMissed && Number(med.medLastMissed) >= doseMs;
+
   // Já adiada pela home e o adiamento ainda não venceu?
   // (se veio doseMsParam, é a notificação do próprio adiamento → deve aparecer)
   const adiadaAindaValida =
@@ -137,7 +141,8 @@ export default function DoseAlert() {
   !!med?.medSnoozedUntil && // ← ajuste p/ o campo que o snoozeDoseInDb grava
   Number(med.medSnoozedUntil) > Date.now();
 
-  const jaTratada = jaConfirmada || adiadaAindaValida;
+
+  const jaTratada = jaConfirmada || adiadaAindaValida || jaPerdida;
 
   useEffect(() => {
     if (!loading && jaTratada) leave();
@@ -174,6 +179,29 @@ export default function DoseAlert() {
     setBusy(true);
     await withTimeout(adiarDose(medId, doseMs, SNOOZE_MINUTES)); // manual → zera contador
     leave();
+  };
+
+  const handleSkip = () => {
+    if (busy || !medId) return;
+    setBusy(true);
+    
+    Alert.alert(
+      'Dose não administrada',
+      'Deseja registrar que esta dose não foi tomada?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Registrar',
+          style: 'destructive',
+          onPress: async () => {
+            setBusy(true);
+            await withTimeout(marcarPerdida(medId, doseMs));
+            leave();
+          },
+        },
+      ],
+      { cancelable: true, onDismiss: () => setBusy(false) }
+    );
   };
 
   const handleAutoTimeout = async () => {
@@ -254,6 +282,14 @@ export default function DoseAlert() {
           style={({ pressed }) => [styles.button, styles.snooze, pressed && styles.pressed]}
         >
           <Text style={styles.snoozeText}>Adiar {SNOOZE_MINUTES} minutos</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={handleSkip}
+          disabled={busy}
+          style={({ pressed }) => [styles.button, styles.skip, pressed && styles.pressed]}
+        >
+          <Text style={styles.skipText}>Não administrada</Text>
         </Pressable>
       </View>
     </LinearGradient>
@@ -339,9 +375,34 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
   },
-  confirm: { backgroundColor: '#FFFFFF' },
-  confirmText: { color: '#1B8585', fontSize: 18, fontWeight: '700' },
-  snooze: { backgroundColor: '#FF6B8A' },
-  snoozeText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
+  confirm: { 
+    backgroundColor: '#FFFFFF' 
+  },
+  confirmText: { 
+    color: '#1B8585', 
+    fontSize: 18, 
+    fontWeight: '700' 
+  },
+  snooze: { 
+    backgroundColor: '#FF6B8A' 
+  },
+  snoozeText: { 
+    color: '#FFFFFF', 
+    fontSize: 16, 
+    fontWeight: '700' 
+  },
+  pressed: { 
+    opacity: 0.85, 
+    transform: [{ scale: 0.98 }] 
+  },
+  skip: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.6)',
+  },
+  skipText: { 
+    color: '#FFFFFF', 
+    fontSize: 16, 
+    fontWeight: '600' 
+  },
 });

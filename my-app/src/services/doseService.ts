@@ -69,34 +69,38 @@ export async function snoozeDoseInDb(
 
 // Dose perdida: não mexe no estoque
 export async function missDoseInDb(
-  medId: string,
-  med: Pick<Medication, 'medName' | 'medSlot' | 'medLastConfirmed' | 'medLastMissed'>,
-  doseMs: number
-) {
-  if (Number(med.medLastConfirmed ?? 0) >= doseMs) return; // já tomada
-  if (Number(med.medLastMissed ?? 0) >= doseMs) return;    // já marcada
+    medId: string,
+    med: Pick<Medication, 'medName' | 'medSlot' | 'medLastConfirmed' | 'medLastMissed'>,
+    doseMs: number,
+    motivo: 'timeout' | 'usuario' = 'timeout',
+ ) {
+      if (Number(med.medLastConfirmed ?? 0) >= doseMs) return;
+      if (Number(med.medLastMissed ?? 0) >= doseMs) return;
 
-  const medRef = getMedRef(medId);
-  const batch = writeBatch(db);
-  batch.update(medRef, {
-    medLastMissed: doseMs,
-    medSnoozedUntil: deleteField(),
-    medAutoSnooze: deleteField(),
-  });
-  batch.set(
-    doc(collection(medRef, 'doseLogs'), String(doseMs)),
-    { scheduledFor: doseMs, status: 'missed', missedAt: serverTimestamp() },
-    { merge: true }
-  );
-  batch.set(missedRef(medId, doseMs), {
-    medId,
-    medName: med.medName,
-    medSlot: String(med.medSlot).replace(/\D/g, ''), // "Slot 2" -> "2"
-    doseMs,
-    status: 'pending',
-    createdAt: serverTimestamp(),
-  });
-  await batch.commit();
+      const porUsuario = motivo === 'usuario';
+      const medRef = getMedRef(medId);
+      const batch = writeBatch(db);
+
+      batch.update(medRef, {
+        medLastMissed: doseMs,
+        medSnoozedUntil: deleteField(),
+        medAutoSnooze: deleteField(),
+      });
+      batch.set(
+        doc(collection(medRef, 'doseLogs'), String(doseMs)),
+        { scheduledFor: doseMs, status: 'missed', reason: motivo, missedAt: serverTimestamp() },
+        { merge: true },
+      );
+      batch.set(missedRef(medId, doseMs), {
+        medId,
+        medName: med.medName,
+        medSlot: String(med.medSlot).replace(/\D/g, ''),
+        doseMs,
+        status: porUsuario ? 'confirmed_missed' : 'pending',
+        createdAt: serverTimestamp(),
+        ...(porUsuario ? { resolvedAt: serverTimestamp() } : {}),
+      });
+      await batch.commit();
 }
 
 // Sim  = mantém como não administrada
