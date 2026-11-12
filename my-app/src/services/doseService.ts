@@ -43,6 +43,7 @@ export async function confirmDoseInDb(medId: string, med: DoseInfo, doseMs: numb
   });
   batch.set(doc(collection(medRef, 'doseLogs'), String(doseMs)), {
     scheduledFor: doseMs,
+    status: 'confirmed',
     confirmedAt: serverTimestamp(),
   });
   // NOVO: se a dose tinha sido marcada como perdida (ex.: usuário tomou pela caixa depois),
@@ -125,6 +126,7 @@ export async function resolveMissedDoseInDb(m: MissedDose, keepMissed: boolean) 
     });
     batch.set(doc(collection(medRef, 'doseLogs'), String(m.doseMs)), {
       scheduledFor: m.doseMs,
+      status: 'confirmed',
       confirmedAt: serverTimestamp(),
       lateConfirmed: true,
     });

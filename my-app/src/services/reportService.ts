@@ -80,15 +80,32 @@ export async function gerarRelatorio(de: Date, ate: Date): Promise<string> {
       )
     )
 
+    const resolvidas: number[] = []
     const confirmadas: number[] = []
 
     for (const logDoc of logsSnap.docs) {
       const log = logDoc.data()
       const previsto = log.scheduledFor as number
-      // confirmedAt é um Timestamp do Firestore; se ainda não sincronizou, usa o horário previsto
-      const confirmadoEm = log.confirmedAt?.toMillis ? log.confirmedAt.toMillis() : previsto
 
-      const mesmoDia = formatarData(confirmadoEm) === formatarData(previsto)
+      if (log.status === 'missed') {
+        linhas.push({
+          quando: previsto,
+          texto: `${formatarData(previsto)} ${formatarHora(previsto)} - ${med.medName} - Não administrada`,
+        })
+
+        naoAdministradas++
+        resolvidas.push(previsto)
+        continue
+      }
+
+      const confirmadoEm =
+        log.confirmedAt?.toMillis
+          ? log.confirmedAt.toMillis()
+          : previsto
+
+      const mesmoDia =
+        formatarData(confirmadoEm) === formatarData(previsto)
+
       const quandoTexto = mesmoDia
         ? formatarHora(confirmadoEm)
         : `${formatarData(confirmadoEm)} ${formatarHora(confirmadoEm)}`
@@ -97,8 +114,10 @@ export async function gerarRelatorio(de: Date, ate: Date): Promise<string> {
         quando: previsto,
         texto: `${formatarData(previsto)} ${formatarHora(previsto)} - ${med.medName} - Administrada às ${quandoTexto}`,
       })
+
       administradas++
       confirmadas.push(previsto)
+      resolvidas.push(previsto)
     }
 
     // Doses previstas que não têm confirmação = não administradas
@@ -109,9 +128,9 @@ export async function gerarRelatorio(de: Date, ate: Date): Promise<string> {
 
     for (const t of horariosPrevistos(med, inicio, fim)) {
       const venceu = t < agora - TOLERANCIA
-      const foiConfirmada = confirmadas.some((c) => Math.abs(c - t) < MINUTO)
+      const foiResolvida = resolvidas.some((r) => Math.abs(r - t) < MINUTO)
 
-      if (venceu && t >= inicioMed && !foiConfirmada) {
+      if (venceu && t >= inicioMed && !foiResolvida) {
         linhas.push({
           quando: t,
           texto: `${formatarData(t)} ${formatarHora(t)} - ${med.medName} - Não administrada`,
