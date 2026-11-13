@@ -16,6 +16,7 @@ import { AppText } from './AppText'
 import { router } from 'expo-router'
 import { cancelMedication } from '../notifications/scheduler'
 import { enviarAgendaParaCaixa } from '../hooks/useBox'
+import { MedIconBox } from '../components/medIconBox'
 
 type HomeSlotsProps = {
     medications: Medication[]
@@ -120,8 +121,7 @@ export function HomeSlots({ medications, onDeleted }: HomeSlotsProps) {
 
                 const card = (
                     <Pressable style={styles.slotCard}>
-                        <View style={styles.slotIconContainer}>
-                        </View>
+                        <MedIconBox med={med}/>
 
                         <View style={styles.slotInfo}>
                             <View style={styles.slotHeaderRow}>

@@ -6,6 +6,7 @@ import { NumberStepper } from '@/src/components/NumberStepper'
 import { Medication } from '@/src/schemas/medSchema'
 import { useMedications } from '@/src/hooks/useMedication'
 import { updateMedication } from '@/src/services/medicationService'
+import { MedIconBox } from '../../../components/medIconBox'
 
 
 type StockSlotsProps = {
@@ -26,7 +27,7 @@ function StockSlots({ medications, onChangeStock }: StockSlotsProps) {
 
                 return (
                     <View key={slotNumber} style={styles.slotCard}>
-                        <View style={styles.slotIconContainer} />
+                        <MedIconBox med={med}/>
 
                         <View style={styles.slotInfo}>
                             <View style={styles.slotHeaderRow}>
