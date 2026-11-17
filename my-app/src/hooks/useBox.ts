@@ -6,8 +6,13 @@ import { getMedications } from '../services/medicationService' // AJUSTE só se 
 import { Medication } from '../schemas/medSchema'
 import { onAuthStateChanged } from 'firebase/auth'
 
-type DoseConfirmada = { slot: number; horario: number } // horario em segundos (unixtime)
-
+export type TipoEvento = 'tomado' | 'adiado' | 'perdido'
+export type EventoCaixa = {
+  id: string
+  tipo: TipoEvento
+  slot: number      // 1..6
+  horario: number   // segundos (unixtime), em hora local gravada como UTC (veja o item 5)
+}
 // Transforma os medicamentos no formato que a caixa entende.
 // Cada item = um horário de alarme:
 // { s: slot, h: hora, m: minuto, n: nome, d: dose, q: estoque, led, buzzer, w?: dias da semana }
@@ -66,15 +71,14 @@ export async function enviarAgendaParaCaixa() {
     return true
 }
 
-export function useBox(onDoseConfirmada?: (dose: DoseConfirmada) => void) {
+export function useBox(onEvento?: (ev: EventoCaixa) => void) {
     const [box, setBox] = useState<any>(null) // null = nenhuma caixa vinculada
     const [carregando, setCarregando] = useState(false)
     const [, forcar] = useState(0)
 
-    const ultimaDoseProcessada = useRef<number | null>(null)
-
-    const callbackRef = useRef(onDoseConfirmada)
-    callbackRef.current = onDoseConfirmada
+    const ultimoEventoId = useRef<string | null>(null)
+    const callbackRef = useRef(onEvento)
+    callbackRef.current = onEvento
 
     // Acha a caixa que pertence a este usuário e acompanha em tempo real
     useEffect(() => {
@@ -84,7 +88,7 @@ export function useBox(onDoseConfirmada?: (dose: DoseConfirmada) => void) {
             // troca de usuário: limpa o listener anterior
             parar?.()
             parar = null
-            ultimaDoseProcessada.current = null
+            ultimoEventoId.current = null
 
             if (!user) {
                 setBox(null)
@@ -104,22 +108,25 @@ export function useBox(onDoseConfirmada?: (dose: DoseConfirmada) => void) {
                     const data = d.data()
                     setBox({ id: d.id, ...data })
 
-                    const horario = Number(data.ultimaDoseHorario) || 0
-                    const slot = Number(data.ultimaDoseSlot)
+                                        const eventoId = typeof data.eventoId === 'string' ? data.eventoId : ''
 
-                    // Primeiro snapshot: só registra o que já existe
-                    if (ultimaDoseProcessada.current === null) {
-                        ultimaDoseProcessada.current = horario
+                    // Primeiro snapshot: só memoriza o evento que já existe, não dispara de novo
+                    if (ultimoEventoId.current === null) {
+                        ultimoEventoId.current = eventoId
                         return
                     }
 
-                    if (
-                        data.ultimaDoseConfirmada === true &&
-                        slot > 0 &&
-                        horario > ultimaDoseProcessada.current
-                    ) {
-                        ultimaDoseProcessada.current = horario
-                        callbackRef.current?.({ slot, horario })
+                    // Só dispara se o evento for novo (o snapshot também roda a cada lastSeen)
+                    if (eventoId && eventoId !== ultimoEventoId.current) {
+                        ultimoEventoId.current = eventoId
+
+                        const tipo = data.eventoTipo as TipoEvento
+                        const slot = Number(data.eventoSlot)
+                        const horario = Number(data.eventoHorario) || 0
+
+                        if (['tomado', 'adiado', 'perdido'].includes(tipo) && slot > 0) {
+                            callbackRef.current?.({ id: eventoId, tipo, slot, horario })
+                        }
                     }
                 },
                 err => console.log('Erro ao ler caixa:', err)
@@ -132,13 +139,21 @@ export function useBox(onDoseConfirmada?: (dose: DoseConfirmada) => void) {
         }
     }, [])
 
+    // re-renderiza a cada 5 s
     useEffect(() => {
-        const t = setInterval(() => forcar(n => n + 1), 30000)
-        return () => clearInterval(t)
+    const t = setInterval(() => forcar(n => n + 1), 5000)
+    return () => clearInterval(t)
     }, [])
 
-    // Caixa manda sinal a cada 30s; sem sinal há 2 min = desligada
-    const online = !!box?.lastSeen && Date.now() / 1000 - box.lastSeen < 120
+    const visto = box?.lastSeen?.toMillis?.() ?? 0           // Timestamp do Firestore
+    const recente = Date.now() - visto < 35_000              // 3 batimentos perdidos (10 s cada)
+    const status: 'online' | 'standby' | 'offline' =
+    !box ? 'offline'
+    : box.estado === 'standby' ? 'standby'
+    : recente ? 'online' : 'offline'
+    const online = status === 'online'
+    // retorne também `status`, `bateria: box?.bateria`
+
     // agendaAck = a caixa confirmou que recebeu essa versão da agenda
     const ultimaSync = box?.agendaAck ? new Date(Number(box.agendaAck)).toLocaleString('pt-BR') : null
 
@@ -190,5 +205,5 @@ export function useBox(onDoseConfirmada?: (dose: DoseConfirmada) => void) {
         }
     }
 
-    return { box, online, ultimaSync, carregando, vincular, sincronizar }
+    return { box, online, ultimaSync, carregando, vincular, sincronizar, status }
 }

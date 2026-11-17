@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, ScrollView, Switch, StyleSheet, TextInput } from 'react-native'
+import { View, ScrollView, Switch, StyleSheet, TextInput, Pressable, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Button } from '../../../components/Button'
 import { AppText } from '../../../components/AppText'
@@ -27,6 +27,7 @@ export default function BoxConfigScreen() {
                 contentContainerStyle={styles.conteudoInterno}
                 showsVerticalScrollIndicator={false}
             >
+                {/* Sem caixa vinculada: formulário de vínculo */}
                 {!box && (
                     <View style={styles.card}>
                         <AppText style={styles.rotulo}>Código da caixa (aparece no Monitor Serial)</AppText>
@@ -38,23 +39,56 @@ export default function BoxConfigScreen() {
                             placeholder="A0B1C2D3E4F5"
                             style={{ backgroundColor: cores.pill, borderRadius: 8, padding: 10, marginVertical: 12 }}
                         />
-                        <Button label={carregando ? 'Vinculando...' : 'Vincular caixa'} variant="blue" onPress={() => vincular(codigo)} />
-
-                        <AppText style={styles.tituloSecao}>Configurações Gerais</AppText>
-
-                        <View style={[styles.bolinha, !online && { backgroundColor: '#B3B3B3' }]} />
-                        <AppText style={styles.pillTexto}>{online ? 'Ligada' : 'Desligada'}</AppText>
-
-                        <Button label={carregando ? 'Sincronizando...' : 'Sincronizar'} variant="blue"
-                                style={styles.botaoSincronizar} onPress={sincronizar} />
-
-                        <AppText style={styles.ultimaSync}>
-                            {ultimaSync ? `Última sincronização feita em ${ultimaSync}` : 'Ainda não sincronizada'}
-                        </AppText>
+                        <Button
+                            label={carregando ? 'Vinculando...' : 'Vincular caixa'}
+                            variant="blue"
+                            onPress={() => vincular(codigo)}
+                        />
                     </View>
                 )}
-             
-                <AppText style={styles.tituloSecao}>Notificações</AppText>
+
+                {/* Com caixa vinculada: configurações gerais */}
+                {box && (
+                    <>
+                        <AppText style={styles.tituloSecao}>Configurações Gerais</AppText>
+
+                        <View style={styles.card}>
+                            <View style={styles.linhaStatus}>
+                                <AppText style={styles.rotuloStatus}>Status da caixa</AppText>
+
+                                <View style={[styles.statusPill, online ? styles.statusOn : styles.statusOff]}>
+                                    <View style={[styles.statusBolinha, online ? styles.bolinhaOn : styles.bolinhaOff]} />
+                                    <AppText style={[styles.statusTexto, online ? styles.textoOn : styles.textoOff]}>
+                                        {online ? 'Ligada' : 'Desligada'}
+                                    </AppText>
+                                </View>
+                            </View>
+
+                            <View style={styles.divisor} />
+
+                            <Pressable
+                                onPress={sincronizar}
+                                disabled={carregando}
+                                style={({ pressed }) => [
+                                    styles.botaoSync,
+                                    pressed && styles.botaoSyncPressionado,
+                                    carregando && styles.botaoSyncDesabilitado,
+                                ]}
+                            >
+                                {carregando && <ActivityIndicator size="small" color={cores.branco} />}
+                                <AppText style={styles.botaoSyncTexto}>
+                                    {carregando ? 'Sincronizando...' : 'Sincronizar agora'}
+                                </AppText>
+                            </Pressable>
+
+                            <AppText style={styles.ultimaSync}>
+                                {ultimaSync ? `Última sincronização feita em ${ultimaSync}` : 'Ainda não sincronizada'}
+                            </AppText>
+                        </View>
+                    </>
+                )}
+
+                <AppText style={styles.tituloSecao}>Noficações</AppText>
 
                 <View style={[styles.card, styles.cardNotificacao]}>
                     <AppText style={styles.textoNotificacao}>
@@ -63,7 +97,7 @@ export default function BoxConfigScreen() {
                     <Switch
                         value={notificar}
                         onValueChange={setNotificar}
-                        trackColor={{ false: cores.primaria, true: cores.primaria }}
+                        trackColor={{ false: '#FF6B8A', true: cores.primaria }}
                         ios_backgroundColor={cores.primaria}
                         thumbColor={cores.branco}
                     />
@@ -156,12 +190,6 @@ const styles = StyleSheet.create({
         marginTop: 6,
         marginBottom: 8,
     },
-    ultimaSync: {
-        fontSize: 10,
-        color: cores.textoSecundario,
-        textAlign: 'center',
-        marginBottom: 16,
-    },
     divisor: {
         height: 1,
         backgroundColor: cores.divisor,
@@ -176,5 +204,79 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 16,
         fontWeight: '600',
+    },
+    linhaStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 14,
+    },
+    rotuloStatus: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: cores.texto,
+    },
+    statusPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 999,
+    },
+    statusOn: {
+        backgroundColor: '#E3F6F5',
+    },
+    statusOff: {
+        backgroundColor: '#EFEFEF',
+    },
+    statusBolinha: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    bolinhaOn: {
+        backgroundColor: cores.primaria,
+    },
+    bolinhaOff: {
+        backgroundColor: '#B3B3B3',
+    },
+    statusTexto: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    textoOn: {
+        color: cores.texto,
+    },
+    textoOff: {
+        color: cores.textoSecundario,
+    },
+    botaoSync: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: cores.primaria,
+        marginTop: 14,
+    },
+    botaoSyncPressionado: {
+        opacity: 0.85,
+        transform: [{ scale: 0.98 }],
+    },
+    botaoSyncDesabilitado: {
+        opacity: 0.6,
+    },
+    botaoSyncTexto: {
+        color: cores.branco,
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    ultimaSync: {
+        fontSize: 12,
+        color: cores.textoSecundario,
+        textAlign: 'center',
+        marginTop: 10,
     },
 })
