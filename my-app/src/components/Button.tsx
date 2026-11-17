@@ -6,7 +6,7 @@ type ButtonProps = TouchableOpacityProps & {
     variant?: 'red' | 'blue' | 'grey' | 'white' | 'blueGrey' //ao invés de usar uma string genérica, o uso de 'vermelho' OU 'azul' faz com que este campo se autocomplete em futuras implementações do botão; exemplo: não pode haver uma variant 'green', pois não existe (somente aceito red ou blue).
 }
 
-export function Button({label, style, variant = 'red', ...rest}: ButtonProps){
+export function Button({label, style, disabled, variant = 'red', ...rest}: ButtonProps){
 
     const variantStyles = {
         red: styles.container,
@@ -25,7 +25,9 @@ export function Button({label, style, variant = 'red', ...rest}: ButtonProps){
     }
 
     return(
-            <TouchableOpacity style={[styles.container, variantStyles[variant], style]} {...rest}>
+            <TouchableOpacity 
+                disabled={disabled}
+                style={[styles.container, variantStyles[variant], disabled && styles.disabled, style]} {...rest}>
                 <Text style={[styles.label, labelStyles[variant]]}>{label}</Text>
             </TouchableOpacity>
     )
@@ -40,6 +42,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         margin: 12,
+    },
+    disabled: {
+        backgroundColor: '#ccc',
     },
     label:{
         color: 'white',

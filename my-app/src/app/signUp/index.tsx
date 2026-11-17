@@ -197,7 +197,7 @@ export default function signUp(){
                         onValueChange={setChecked}
                     />
                     <Link href={'/politicaPrivacidade'}>
-                        <AppText fontSize={18}>
+                        <AppText fontSize={18} style={{textDecorationLine: 'underline'}}>
                             Concordo com a política de segurança e termos de uso do Chronomedi.
                         </AppText>
                     </Link>
@@ -208,6 +208,7 @@ export default function signUp(){
                 <Button
                     label={isLoading ? 'Aguarde...' : 'Cadastrar'}
                     onPress={ handleSubmit(handleSignUpData) }
+                    disabled={isLoading || !isChecked}
                 />
             </ScrollView>
         </KeyboardAvoidingView>
