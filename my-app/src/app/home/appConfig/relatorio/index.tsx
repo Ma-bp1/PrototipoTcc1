@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
     View,
     ScrollView,
@@ -10,7 +10,6 @@ import {
     ActivityIndicator,
     Alert,
 } from 'react-native'
-import { router } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import * as Print from 'expo-print'
@@ -19,7 +18,17 @@ import * as Sharing from 'expo-sharing'
 import { Button } from '../../../../components/Button'
 import { AppText } from '../../../../components/AppText'
 import { QuestionButton } from '../../../../components/QuestionButton'
-import { gerarRelatorio } from '../../../../services/reportService'
+import {
+    gerarRelatorio,
+    limparRelatorio,
+    buscarUltimaExclusao,
+} from '../../../../services/reportService'
+import {
+    inicioDoDia,
+    formatarData,
+    formatarDataHora,
+    dataParaArquivo,
+} from '../../../../utils/data'
 
 const cores = {
     primaria: '#2DB5B0',
@@ -28,29 +37,10 @@ const cores = {
     branco: '#FFFFFF',
     campoData: '#D3D3D3',
     textoRelatorio: '#555555',
+    perigo: '#D9534F',
 }
 
 type Campo = 'de' | 'ate'
-
-// ---------- Helpers ----------
-
-const inicioDoDia = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
-
-const formatarData = (d: Date) => {
-    const dd = String(d.getDate()).padStart(2, '0')
-    const mm = String(d.getMonth() + 1).padStart(2, '0')
-    const aa = String(d.getFullYear()).slice(-2)
-    return `${dd}/${mm}/${aa}`
-}
-
-const dataParaArquivo = (d: Date) => {
-    const dd = String(d.getDate()).padStart(2, '0')
-    const mm = String(d.getMonth() + 1).padStart(2, '0')
-    return `${d.getFullYear()}${mm}${dd}`
-}
-
-const nomeDoArquivo = (de: Date, ate: Date) =>
-    `relatorio-uso_${dataParaArquivo(de)}_${dataParaArquivo(ate)}`
 
 const escapeHtml = (s: string) =>
     s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -60,7 +50,7 @@ function montarHtml(de: Date, ate: Date, texto: string) {
     return `
     <html>
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <style>
           body { font-family: Helvetica, Arial, sans-serif; padding: 24px; color: #333; }
           h1 { color: ${cores.texto}; font-size: 22px; margin-bottom: 4px; }
@@ -76,47 +66,46 @@ function montarHtml(de: Date, ate: Date, texto: string) {
     </html>`
 }
 
-// ---------- Tela ----------
-
 export default function RelatorioUsoMedicamentoScreen() {
-    const [modalPremium, setModalPremium] = useState(false)
-
     const hoje = inicioDoDia(new Date())
-    const [de, setDe] = useState(new Date(2026, 3, 1))
-    const [ate, setAte] = useState(new Date(2026, 3, 13))
+
+    const [de, setDe] = useState(new Date(hoje.getFullYear(), hoje.getMonth(), 1))
+    const [ate, setAte] = useState(hoje)
 
     const [relatorio, setRelatorio] = useState('')
+    const [ultimaExclusao, setUltimaExclusao] = useState<Date | null>(null)
+
     const [carregando, setCarregando] = useState(false)
     const [gerando, setGerando] = useState(false)
+    const [limpando, setLimpando] = useState(false)
 
+    // Usado só no iOS (modal do seletor de data)
+    const [campoAberto, setCampoAberto] = useState<Campo | null>(null)
     const [dataTemp, setDataTemp] = useState(hoje)
 
-    const requisicaoId = useRef(0)
-
-    const irParaPremium = () => {
-        setModalPremium(false)
-        router.push('/premium') // ajuste para a rota real da tela Premium
+    const carregarRelatorio = async () => {
+        setCarregando(true)
+        try {
+            setRelatorio(await gerarRelatorio(de, ate))
+        } catch (e) {
+            setRelatorio('')
+            Alert.alert('Erro', 'Não foi possível carregar o relatório.')
+        } finally {
+            setCarregando(false)
+        }
     }
 
-    // Recalcula o relatório sempre que o período muda
+    // Recarrega o relatório sempre que o período muda
     useEffect(() => {
-        const id = ++requisicaoId.current
-        setCarregando(true)
-
-        gerarRelatorio(de, ate)
-            .then(texto => {
-                if (id !== requisicaoId.current) return // ignora resposta antiga
-                setRelatorio(texto)
-            })
-            .catch(() => {
-                if (id !== requisicaoId.current) return
-                setRelatorio('')
-                Alert.alert('Erro', 'Não foi possível calcular o relatório.')
-            })
-            .finally(() => {
-                if (id === requisicaoId.current) setCarregando(false)
-            })
+        carregarRelatorio()
     }, [de, ate])
+
+    // Busca a data da última exclusão ao abrir a tela
+    useEffect(() => {
+        buscarUltimaExclusao()
+            .then(setUltimaExclusao)
+            .catch(() => {})
+    }, [])
 
     // Aplica a data escolhida mantendo "De" <= "A"
     const aplicarData = (campo: Campo, valor: Date) => {
@@ -144,15 +133,41 @@ export default function RelatorioUsoMedicamentoScreen() {
             })
         } else {
             setDataTemp(valorAtual)
-            
+            setCampoAberto(campo)
         }
     }
 
-    
+    const confirmarDataIos = () => {
+        if (campoAberto) aplicarData(campoAberto, dataTemp)
+        setCampoAberto(null)
+    }
 
-    // Gera o PDF em arquivo e entrega ao usuário:
-    // - Android: usuário escolhe a pasta (ex.: Downloads) e o PDF é gravado lá
-    // - iOS: abre a folha de compartilhamento ("Salvar em Arquivos", Imprimir, etc.)
+    // Apaga do Firebase os registros do período escolhido
+    const limpar = async () => {
+        try {
+            setLimpando(true)
+            await limparRelatorio(de, ate)
+            setUltimaExclusao(new Date())
+            await carregarRelatorio()
+        } catch (e) {
+            Alert.alert('Erro', 'Não foi possível limpar o relatório.')
+        } finally {
+            setLimpando(false)
+        }
+    }
+
+    const confirmarLimpeza = () => {
+        Alert.alert(
+            'Limpar relatório',
+            `Deseja apagar todos os registros de ${formatarData(de)} a ${formatarData(ate)}? Essa ação não pode ser desfeita.`,
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                { text: 'Apagar', style: 'destructive', onPress: limpar },
+            ]
+        )
+    }
+
+    // Gera o PDF e abre a folha de compartilhamento (salvar em arquivos, imprimir, etc.)
     const baixarPdf = async () => {
         if (carregando || gerando) return
         try {
@@ -161,38 +176,16 @@ export default function RelatorioUsoMedicamentoScreen() {
             const { uri } = await Print.printToFileAsync({
                 html: montarHtml(de, ate, relatorio),
             })
-            const nome = nomeDoArquivo(de, ate)
 
-            if (Platform.OS === 'android') {
-                const saf = FileSystem.StorageAccessFramework
-                const permissao = await saf.requestDirectoryPermissionsAsync()
-                if (!permissao.granted) return // usuário cancelou
+            // Renomeia o arquivo temporário para um nome legível
+            const novoUri = `${FileSystem.cacheDirectory}relatorio-uso_${dataParaArquivo(de)}_${dataParaArquivo(ate)}.pdf`
+            await FileSystem.moveAsync({ from: uri, to: novoUri })
 
-                const base64 = await FileSystem.readAsStringAsync(uri, {
-                    encoding: FileSystem.EncodingType.Base64,
-                })
-                const destino = await saf.createFileAsync(
-                    permissao.directoryUri,
-                    nome,
-                    'application/pdf'
-                )
-                await FileSystem.writeAsStringAsync(destino, base64, {
-                    encoding: FileSystem.EncodingType.Base64,
-                })
-                Alert.alert('PDF salvo', 'O relatório foi salvo na pasta escolhida.')
-            } else {
-                // Renomeia o arquivo temporário para um nome legível
-                const novoUri = `${FileSystem.cacheDirectory}${nome}.pdf`
-                await FileSystem.moveAsync({ from: uri, to: novoUri })
-
-                if (await Sharing.isAvailableAsync()) {
-                    await Sharing.shareAsync(novoUri, {
-                        mimeType: 'application/pdf',
-                        UTI: 'com.adobe.pdf',
-                        dialogTitle: 'Salvar relatório',
-                    })
-                }
-            }
+            await Sharing.shareAsync(novoUri, {
+                mimeType: 'application/pdf',
+                UTI: 'com.adobe.pdf',
+                dialogTitle: 'Salvar relatório',
+            })
         } catch (e) {
             Alert.alert('Erro', 'Não foi possível gerar o PDF.')
         } finally {
@@ -207,23 +200,23 @@ export default function RelatorioUsoMedicamentoScreen() {
                 contentContainerStyle={styles.conteudoInterno}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Ajuda */}
                 <QuestionButton
                     style={styles.ajuda}
                     titulo="Relatório de uso"
                     paragrafos={[
                         'Selecione o período desejado para gerar o relatório de uso dos medicamentos.',
-                        'Depois, use o botão Imprimir/Salvar para exportar o relatório.',
+                        'Use o botão Imprimir/Salvar para exportar o relatório ou Limpar período para apagar os registros do período escolhido.',
                     ]}
                 />
 
-                {/* Seleção de período */}
                 <AppText fontSize={18} style={styles.tituloPeriodo}>
                     Selecione entre um período:
                 </AppText>
 
                 <AppText style={[{ fontSize: 12 }, styles.ultimaExclusao]}>
-                    Última exclusão em 12/03/26, 12:00
+                    {ultimaExclusao
+                        ? `Última exclusão em ${formatarDataHora(ultimaExclusao)}`
+                        : 'Nenhuma exclusão realizada'}
                 </AppText>
 
                 <View style={styles.linhaPeriodo}>
@@ -246,7 +239,6 @@ export default function RelatorioUsoMedicamentoScreen() {
                     </TouchableOpacity>
                 </View>
 
-                {/* Card do relatório */}
                 <View style={styles.card}>
                     <View style={styles.relatorioBox}>
                         {carregando ? (
@@ -261,43 +253,54 @@ export default function RelatorioUsoMedicamentoScreen() {
                     <Button
                         label={gerando ? 'Gerando...' : 'Imprimir/Salvar'}
                         variant="blue"
-                        style={styles.botaoImprimir}
+                        style={styles.botao}
                         onPress={baixarPdf}
+                    />
+
+                    <Button
+                        label={limpando ? 'Limpando...' : 'Limpar período'}
+                        variant="blue"
+                        style={[styles.botao, { backgroundColor: cores.perigo }]}
+                        onPress={confirmarLimpeza}
                     />
                 </View>
             </ScrollView>
+
+            {/* Seletor de data do iOS */}
+            <Modal visible={campoAberto !== null} transparent animationType="slide">
+                <View style={styles.modalFundo}>
+                    <View style={styles.modalCard}>
+                        <DateTimePicker
+                            value={dataTemp}
+                            mode="date"
+                            display="spinner"
+                            maximumDate={hoje}
+                            onChange={(event, selecionada) => {
+                                if (selecionada) setDataTemp(selecionada)
+                            }}
+                        />
+                        <View style={styles.modalBotoes}>
+                            <TouchableOpacity onPress={() => setCampoAberto(null)}>
+                                <Text style={styles.modalCancelar}>Cancelar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={confirmarDataIos}>
+                                <Text style={styles.modalConfirmar}>Confirmar</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     )
 }
 
 const styles = StyleSheet.create({
-    safe: {
-        flex: 1,
-    },
-    conteudo: {
-        flex: 1,
-        backgroundColor: cores.fundo,
-    },
-    conteudoInterno: {
-        paddingHorizontal: 16,
-        paddingTop: 16,
-        paddingBottom: 24,
-    },
-    ajuda: {
-        position: 'absolute',
-        top: 16,
-        right: 16,
-        zIndex: 1,
-    },
-    tituloPeriodo: {
-        fontWeight: '600',
-        marginBottom: 8,
-        paddingRight: 36,
-    },
-    ultimaExclusao: {
-        marginBottom: 12,
-        marginLeft: 4,
-    },
+    safe: { flex: 1 },
+    conteudo: { flex: 1, backgroundColor: cores.fundo },
+    conteudoInterno: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 },
+    ajuda: { position: 'absolute', top: 16, right: 16, zIndex: 1 },
+    tituloPeriodo: { fontWeight: '600', marginBottom: 8, paddingRight: 36 },
+    ultimaExclusao: { marginBottom: 12, marginLeft: 4 },
     linhaPeriodo: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -305,9 +308,7 @@ const styles = StyleSheet.create({
         gap: 10,
         marginBottom: 20,
     },
-    rotuloPeriodo: {
-        fontWeight: '600',
-    },
+    rotuloPeriodo: { fontWeight: '600' },
     campoData: {
         width: 110,
         height: 34,
@@ -316,11 +317,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    campoDataTexto: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: cores.texto,
-    },
+    campoDataTexto: { fontSize: 18, fontWeight: '600', color: cores.texto },
     card: {
         backgroundColor: cores.branco,
         borderRadius: 30,
@@ -333,17 +330,11 @@ const styles = StyleSheet.create({
         minHeight: 320,
         backgroundColor: cores.fundo,
         borderRadius: 21,
-        paddingVertical: 20,
-        paddingHorizontal: 20,
+        padding: 20,
     },
-    carregando: {
-        alignSelf: 'center',
-    },
-    relatorioTexto: {
-        color: cores.textoRelatorio,
-        lineHeight: 18,
-    },
-    botaoImprimir: {
+    carregando: { alignSelf: 'center' },
+    relatorioTexto: { color: cores.textoRelatorio, lineHeight: 18 },
+    botao: {
         width: 'auto',
         height: 44,
         alignSelf: 'center',
@@ -352,12 +343,7 @@ const styles = StyleSheet.create({
         marginTop: 12,
         marginBottom: 0,
     },
-    // Modal do picker (iOS)
-    modalFundo: {
-        flex: 1,
-        justifyContent: 'flex-end',
-        backgroundColor: 'rgba(0,0,0,0.35)',
-    },
+    modalFundo: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
     modalCard: {
         backgroundColor: cores.branco,
         borderTopLeftRadius: 24,
@@ -371,13 +357,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 28,
         marginTop: 8,
     },
-    modalCancelar: {
-        fontSize: 16,
-        color: cores.textoRelatorio,
-    },
-    modalConfirmar: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: cores.primaria,
-    },
+    modalCancelar: { fontSize: 16, color: cores.textoRelatorio },
+    modalConfirmar: { fontSize: 16, fontWeight: '600', color: cores.primaria },
 })
