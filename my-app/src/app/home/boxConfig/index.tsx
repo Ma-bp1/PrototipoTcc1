@@ -1,9 +1,11 @@
-import { useState } from 'react'
-import { View, ScrollView, Switch, StyleSheet, TextInput, Pressable, ActivityIndicator } from 'react-native'
+import { useEffect, useState } from 'react'
+import { View, ScrollView, Switch, StyleSheet, TextInput, Pressable, ActivityIndicator, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Button } from '../../../components/Button'
 import { AppText } from '../../../components/AppText'
 import { useBox } from '../../../hooks/useBox'
+import { AlertSettings, getAlertSettings, saveAlertSettings } from '@/src/services/alertSettings'
+import { rescheduleAllMedications } from '@/src/services/rescheduleAll'
 
 const cores = {
     primaria: '#2DB5B0',
@@ -16,7 +18,27 @@ const cores = {
 }
 
 export default function BoxConfigScreen() {
-    const [notificar, setNotificar] = useState(false)
+    const [settings, setSettings] = useState<AlertSettings | null>(null)
+
+    useEffect(() => {
+    getAlertSettings().then(setSettings)
+    }, [])
+
+    const alternarAntecedencia = async (valor: boolean) => {
+    if (!settings) return
+    const anterior = settings
+    const novo = { ...settings, advance5: valor }
+    setSettings(novo)
+    try {
+        await saveAlertSettings(novo)
+        if (novo.medAlert) await rescheduleAllMedications()
+    } catch {
+        setSettings(anterior)
+        await saveAlertSettings(anterior).catch(() => {})
+        Alert.alert('Não foi possível salvar.', 'Tente novamente.')
+    }
+    }
+
     const [codigo, setCodigo] = useState('')
     const { box, online, ultimaSync, carregando, vincular, sincronizar } = useBox()
 
@@ -95,8 +117,9 @@ export default function BoxConfigScreen() {
                         Notificar com 5 minutos de antecedência
                     </AppText>
                     <Switch
-                        value={notificar}
-                        onValueChange={setNotificar}
+                        value={settings?.advance5 ?? false}
+                        onValueChange={alternarAntecedencia}
+                        disabled={!settings}
                         trackColor={{ false: '#FF6B8A', true: cores.primaria }}
                         ios_backgroundColor={cores.primaria}
                         thumbColor={cores.branco}

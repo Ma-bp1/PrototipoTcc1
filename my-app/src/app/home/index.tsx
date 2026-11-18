@@ -1,5 +1,5 @@
 import { View, ScrollView, StyleSheet, Image } from 'react-native'
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useFocusEffect } from 'expo-router'
 
 import { AppText } from '../../components/AppText'
@@ -8,6 +8,7 @@ import { HomeSlots } from '../../components/HomeSlots'
 import { useMedications } from '../../hooks/useMedication'
 import { useDoseActions } from '../../hooks/useDoseActions'
 import { useBox } from '../../hooks/useBox'
+import { limparNotificacoesOrfas } from '../../notifications/scheduler'
 
 const STATUS = {
     online:  { label: 'Ligada',    cor: '#198289', fundo: '#E3F7F5' },
@@ -25,6 +26,12 @@ export default function Home() {
             refetch()
         }, [refetch])
     )
+
+    useEffect(() => {
+        // só limpa quando já tem a lista carregada
+        if (medications.length === 0) return
+        limparNotificacoesOrfas(medications.map((m) => m.id))
+    }, [medications])
 
     const { label, cor, fundo } = STATUS[status]
 

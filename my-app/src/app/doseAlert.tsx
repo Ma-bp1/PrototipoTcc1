@@ -9,6 +9,7 @@ import { auth, db } from '../config/firebaseConfig';
 import { getAlertSettings } from '../services/alertSettings';
 import type { MedData } from '../schemas/medSchema';
 import { useDoseActions } from '../hooks/useDoseActions';
+import { cancelMedication } from '../notifications/scheduler';
 
 const SNOOZE_MINUTES = 5;
 const MAX_AUTO_SNOOZES = 3;
@@ -84,6 +85,7 @@ export default function DoseAlert() {
   const [med, setMed] = useState<StoredMed | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [naoExiste, setNaoExiste] = useState(false);
 
   const medList = useMemo(
     () => (med && medId ? [{ ...med, id: medId }] : []),
@@ -109,6 +111,7 @@ export default function DoseAlert() {
 
         const snap = await getDoc(doc(db, 'users', userId, 'medications', medId));
         if (!cancelled && snap.exists()) setMed(snap.data() as StoredMed);
+        else setNaoExiste(true);
       } catch (e) {
         console.warn('Falha ao carregar medicamento', e);
       } finally {
@@ -142,7 +145,7 @@ export default function DoseAlert() {
   Number(med.medSnoozedUntil) > Date.now();
 
 
-  const jaTratada = jaConfirmada || adiadaAindaValida || jaPerdida;
+  const jaTratada = jaConfirmada || adiadaAindaValida || jaPerdida || naoExiste;
 
   useEffect(() => {
     if (!loading && jaTratada) leave();
@@ -166,6 +169,13 @@ export default function DoseAlert() {
     const t = setTimeout(handleAutoTimeout, AUTO_TIMEOUT_MS);
     return () => clearTimeout(t);
   }, [loading, jaTratada, busy, med]);
+
+    useEffect(() => {
+    if (naoExiste && medId) {
+      cancelMedication(medId); // apaga as notificações desse remédio
+      leave();
+    }
+  }, [naoExiste, medId]);
 
   const handleConfirm = async () => {
     if (busy || !medId) return;

@@ -13,6 +13,7 @@ import { Input } from '@/src/components/Input'
 import { AppText } from '@/src/components/AppText'
 import { loginSchema } from '@/src/schemas/authSchema'
 import { PasswordInput } from '../../../components/PasswordInput'
+import { cancelAllMedicationAlerts } from '@/src/notifications/scheduler'
 
 const db = getFirestore(auth.app)
 
@@ -274,6 +275,7 @@ export default function Profile() {
 
     async function handleLogout() {
         try {
+            await cancelAllMedicationAlerts() // cancela notificações agendadas
             await signOut(auth)
             router.replace('/login')
             Alert.alert('Deslogado com sucesso.')
