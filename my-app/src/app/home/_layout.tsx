@@ -57,7 +57,7 @@ function CustomTabBar({state, navigation}: { state: any; navigation: any }) {
             <CustomTabButton
                 icon='user'
                 isFocused={currentRoute === 'profile/index'}
-                onPress={()=> navigation.navigate('profile/index')}
+                onPress={()=> navigation.navigate('profile/index', {from: 'dock'})}
             />
         
             <View style={styles.centerButtonContainer}>
@@ -127,7 +127,18 @@ export default function TabsLayout() {
         >
             <Tabs.Screen name='index'/>
             <Tabs.Screen name='stock/index' options={{ title: 'Estoque' }}/>
-            <Tabs.Screen name='profile/index' options={{ title: 'Perfil' }}/>
+            <Tabs.Screen
+                name='profile/index'
+                options={({ route }) => {
+                    const from = (route.params as { from?: string } | undefined)?.from;
+                    return {
+                        title: 'Perfil',
+                        headerLeft: () => (
+                            <BackButton to={from === 'appConfig' ? '/home/appConfig' : '/home'} />
+                        ),
+                    };
+                }}
+            />
             <Tabs.Screen name='boxConfig/index' options={{ title: 'Configurações da Caixa' }}/>
             <Tabs.Screen name='appConfig/index' options={{ title: 'Configurações' }} />
             <Tabs.Screen
