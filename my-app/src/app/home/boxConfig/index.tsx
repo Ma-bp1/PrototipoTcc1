@@ -26,9 +26,9 @@ export default function BoxConfigScreen() {
 
     const alternarAntecedencia = async (valor: boolean) => {
     if (!settings) return
-    const anterior = settings
-    const novo = { ...settings, advance5: valor }
-    setSettings(novo)
+        const anterior = settings
+        const novo = { ...settings, advance5: valor }
+        setSettings(novo)
     try {
         await saveAlertSettings(novo)
         if (novo.medAlert) await rescheduleAllMedications()

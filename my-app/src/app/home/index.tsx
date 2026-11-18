@@ -1,6 +1,6 @@
-import { View, ScrollView, StyleSheet, Image } from 'react-native'
+import { View, ScrollView, StyleSheet, Image, Pressable } from 'react-native'
 import { useCallback, useEffect } from 'react'
-import { useFocusEffect } from 'expo-router'
+import { useFocusEffect, useRouter } from 'expo-router'
 
 import { AppText } from '../../components/AppText'
 import LembreteCards from '../../components/LembreteCards'
@@ -35,6 +35,8 @@ export default function Home() {
 
     const { label, cor, fundo } = STATUS[status]
 
+    const route = useRouter()
+
     return (
         <View style={styles.container}>
             <ScrollView contentContainerStyle={{ paddingBottom: 130 }}>
@@ -47,10 +49,12 @@ export default function Home() {
 
                     <AppText style={styles.title}>Caixa Organizadora</AppText>
 
-                    <View style={[styles.badge, { backgroundColor: fundo }]}>
+                    <Pressable 
+                        onPress={() => route.push('/home/boxConfig')}
+                        style={[styles.badge, { backgroundColor: fundo }]}>
                         <View style={[styles.dot, { backgroundColor: cor }]} />
                         <AppText style={[styles.badgeText, { color: cor }]}>{label}</AppText>
-                    </View>
+                    </Pressable>
                 </View>
 
                 <AppText style={styles.section}>Lembretes</AppText>
