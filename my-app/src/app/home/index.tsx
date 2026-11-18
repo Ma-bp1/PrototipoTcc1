@@ -59,7 +59,7 @@ export default function Home() {
                     onAdiar={adiarDose}
                 />
 
-                <AppText style={styles.section}>Slots da Caixa</AppText>
+                <AppText style={styles.section}>Compartimentos da Caixa</AppText>
                 <HomeSlots
                     medications={medications}
                     onDeleted={(id) => setMedications((prev) => prev.filter((m) => m.id !== id))}
