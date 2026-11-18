@@ -3,7 +3,7 @@ import { View, ScrollView, Switch, StyleSheet, TextInput, Pressable, ActivityInd
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Button } from '../../../components/Button'
 import { AppText } from '../../../components/AppText'
-import { useBox } from '../../../hooks/useBox'
+import { useBox, STATUS } from '../../../hooks/useBox'
 import { AlertSettings, getAlertSettings, saveAlertSettings } from '@/src/services/alertSettings'
 import { rescheduleAllMedications } from '@/src/services/rescheduleAll'
 
@@ -40,7 +40,8 @@ export default function BoxConfigScreen() {
     }
 
     const [codigo, setCodigo] = useState('')
-    const { box, online, ultimaSync, carregando, vincular, sincronizar } = useBox()
+    const { box, status, ultimaSync, carregando, vincular, sincronizar } = useBox()
+    const { label, cor, fundo } = STATUS[status]
 
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
@@ -78,10 +79,10 @@ export default function BoxConfigScreen() {
                             <View style={styles.linhaStatus}>
                                 <AppText style={styles.rotuloStatus}>Status da caixa</AppText>
 
-                                <View style={[styles.statusPill, online ? styles.statusOn : styles.statusOff]}>
-                                    <View style={[styles.statusBolinha, online ? styles.bolinhaOn : styles.bolinhaOff]} />
-                                    <AppText style={[styles.statusTexto, online ? styles.textoOn : styles.textoOff]}>
-                                        {online ? 'Ligada' : 'Desligada'}
+                                <View style={[styles.statusPill, { backgroundColor: fundo }]}>
+                                    <View style={[styles.statusBolinha, { backgroundColor: cor }]} />
+                                    <AppText style={[styles.statusTexto, { color: cor }]}>
+                                        {label}
                                     </AppText>
                                 </View>
                             </View>
@@ -247,32 +248,14 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
         borderRadius: 999,
     },
-    statusOn: {
-        backgroundColor: '#E3F6F5',
-    },
-    statusOff: {
-        backgroundColor: '#EFEFEF',
-    },
     statusBolinha: {
         width: 8,
         height: 8,
         borderRadius: 4,
     },
-    bolinhaOn: {
-        backgroundColor: cores.primaria,
-    },
-    bolinhaOff: {
-        backgroundColor: '#B3B3B3',
-    },
     statusTexto: {
         fontSize: 13,
         fontWeight: '600',
-    },
-    textoOn: {
-        color: cores.texto,
-    },
-    textoOff: {
-        color: cores.textoSecundario,
     },
     botaoSync: {
         flexDirection: 'row',

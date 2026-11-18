@@ -6,6 +6,12 @@ import { getMedications } from '../services/medicationService' // AJUSTE só se 
 import { Medication } from '../schemas/medSchema'
 import { onAuthStateChanged } from 'firebase/auth'
 
+export const STATUS = {
+    online:  { label: 'Ligada',    cor: '#198289', fundo: '#E3F7F5' },
+    standby: { label: 'Em espera', cor: '#C98A0B', fundo: '#FFF4DB' },
+    offline: { label: 'Desligada', cor: '#8A9796', fundo: '#EEF1F1' },
+}
+
 export type TipoEvento = 'tomado' | 'adiado' | 'perdido'
 export type EventoCaixa = {
   id: string
@@ -148,9 +154,9 @@ export function useBox(onEvento?: (ev: EventoCaixa) => void) {
     const visto = box?.lastSeen?.toMillis?.() ?? 0           // Timestamp do Firestore
     const recente = Date.now() - visto < 35_000              // 3 batimentos perdidos (10 s cada)
     const status: 'online' | 'standby' | 'offline' =
-    !box ? 'offline'
+    !box || !recente ? 'offline'
     : box.estado === 'standby' ? 'standby'
-    : recente ? 'online' : 'offline'
+    : 'online' 
     const online = status === 'online'
     // retorne também `status`, `bateria: box?.bateria`
 

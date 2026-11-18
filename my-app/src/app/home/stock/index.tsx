@@ -31,7 +31,7 @@ function StockSlots({ medications, onChangeStock }: StockSlotsProps) {
 
                         <View style={styles.slotInfo}>
                             <View style={styles.slotHeaderRow}>
-                                <AppText style={styles.slotTitle}>Slot {slotNumber}</AppText>
+                                <AppText style={styles.slotTitle}>Compartimento {slotNumber}</AppText>
                             </View>
 
                             {med ? (
@@ -51,7 +51,7 @@ function StockSlots({ medications, onChangeStock }: StockSlotsProps) {
                                     </AppText>
                                 </>
                             ) : (
-                                <AppText>Slot vazio</AppText>
+                                <AppText>Vazio</AppText>
                             )}
                         </View>
                     </View>

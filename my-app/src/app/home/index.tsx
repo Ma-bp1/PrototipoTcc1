@@ -9,12 +9,7 @@ import { useMedications } from '../../hooks/useMedication'
 import { useDoseActions } from '../../hooks/useDoseActions'
 import { useBox } from '../../hooks/useBox'
 import { limparNotificacoesOrfas } from '../../notifications/scheduler'
-
-const STATUS = {
-    online:  { label: 'Ligada',    cor: '#198289', fundo: '#E3F7F5' },
-    standby: { label: 'Em espera', cor: '#C98A0B', fundo: '#FFF4DB' },
-    offline: { label: 'Desligada', cor: '#8A9796', fundo: '#EEF1F1' },
-}
+import { STATUS } from '../../hooks/useBox'
 
 export default function Home() {
     const { status } = useBox()
