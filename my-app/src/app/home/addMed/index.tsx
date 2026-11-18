@@ -37,7 +37,7 @@ const EMPTY_FORM: MedData = {
     medName: '',
     medSlot: undefined as any,
     medRepetitions: { type: 'diario' },
-    medTime: '',
+    medTime: '16:01',
     medStock: 0,
     medStockConsumption: 0,
     medAdminRoute: '',
@@ -99,6 +99,12 @@ export default function AddMed(){
           }
         }, [isEditing])
     )
+
+    useEffect(() => {
+        if (!isEditing) {
+            reset(EMPTY_FORM)
+        }
+    }, [medicineId])
 
     const medPhoto = watch('medPhoto')
 
@@ -427,7 +433,7 @@ export default function AddMed(){
                                 />
                             )}
                         />
-                        {errors.medName && <AppText>{errors.medName.message}</AppText>}
+                        {errors.medDesc && <AppText>{errors.medDesc.message}</AppText>}
                     </View>
 
                     <AppText> Ícone: </AppText>
