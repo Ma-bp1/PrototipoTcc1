@@ -5,6 +5,25 @@ import type { Medication } from '../schemas/medSchema';
 
 type DoseInfo = Pick<Medication, 'medStock' | 'medStockConsumption' | 'medLastConfirmed' | 'medLastMissed'>;
 
+export const DEFAULT_MIN_STOCK = 2;
+
+// consumo <= 0 vira 1, como na caixa
+export function getConsumption(med: Pick<Medication, 'medStockConsumption'>): number {
+  return med.medStockConsumption > 0 ? med.medStockConsumption : 1;
+}
+
+// doses que ainda dá para tomar
+export function getDosesLeft(med: Pick<Medication, 'medStock' | 'medStockConsumption'>): number {
+  return Math.floor(med.medStock / getConsumption(med));
+}
+
+// estoque baixo = doses restantes <= mínimo
+export function isLowStock(
+  med: Pick<Medication, 'medStock' | 'medStockConsumption'> & { medStockMin?: number },
+): boolean {
+  return getDosesLeft(med) <= (med.medStockMin ?? DEFAULT_MIN_STOCK);
+}
+
 export type MissedDose = {
   id: string;
   medId: string;
@@ -31,7 +50,7 @@ export async function confirmDoseInDb(medId: string, med: DoseInfo, doseMs: numb
     return { medStock: med.medStock, medLastConfirmed: med.medLastConfirmed };
   }
 
-  const novoEstoque = Math.max(0, med.medStock - med.medStockConsumption);
+  const novoEstoque = Math.max(0, med.medStock - getConsumption(med));
   const medRef = getMedRef(medId);
 
   const batch = writeBatch(db);
@@ -121,7 +140,7 @@ export async function resolveMissedDoseInDb(m: MissedDose, keepMissed: boolean) 
   if (snap.exists()) {
     const med = snap.data() as Medication;
     batch.update(medRef, {
-      medStock: Math.max(0, med.medStock - med.medStockConsumption),
+      medStock: Math.max(0, med.medStock - getConsumption(med)),
       ...(Number(med.medLastConfirmed ?? 0) < m.doseMs ? { medLastConfirmed: m.doseMs } : {}),
     });
     batch.set(doc(collection(medRef, 'doseLogs'), String(m.doseMs)), {

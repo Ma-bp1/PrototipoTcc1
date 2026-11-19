@@ -118,21 +118,22 @@ export function useDoseActions(
         })
 
     const marcarPerdida = (medId: string, doseMs: number) =>
-    executar(medId, 'Não foi possível registrar a dose perdida.', async () => {
-        const med = medications.find((m) => m.id === medId)
-        if (!med) return
+        executar(medId, 'Não foi possível registrar a dose perdida.', async () => {
+            const med = medications.find((m) => m.id === medId)
+            if (!med) return
 
-        await cancelSnooze(medId)
-        await missDoseInDb(medId, med, doseMs)
+            // primeiro a caixa (já tem try/catch interno, não derruba o resto)
+            mandarComandoCaixa(med, 'perdido')
 
-        await mandarComandoCaixa(med, 'perdido')
+            await cancelSnooze(medId)
+            await missDoseInDb(medId, med, doseMs)
 
-        atualizarLocal(medId, {
+            atualizarLocal(medId, {
             medLastMissed: doseMs,
             medSnoozedUntil: undefined,
             medAutoSnooze: undefined,
+            })
         })
-    })
 
     return { confirmarDose, adiarDose, marcarPerdida }
 }

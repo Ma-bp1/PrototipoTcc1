@@ -17,6 +17,8 @@ import { router } from 'expo-router'
 import { cancelMedication } from '../notifications/scheduler'
 import { enviarAgendaParaCaixa } from '../hooks/useBox'
 import { MedIconBox } from '../components/MedIconBox'
+import { isLowStock as checkLowStock } from '../services/doseService'
+
 
 
 type HomeSlotsProps = {
@@ -116,9 +118,7 @@ export function HomeSlots({ medications, onDeleted }: HomeSlotsProps) {
             {totalSlots.map((slotNumber) => {
                 const med = medications.find((m) => m.medSlot === `slot_${slotNumber}`)
 
-                const isLowStock = med?.medRepetitions
-                    ? med.medStock <= med.medStockConsumption
-                    : false
+                const isLowStock = med ? checkLowStock(med) : false
 
                 const card = (
                     <Pressable style={styles.slotCard}>
