@@ -1,5 +1,4 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native'
-import { Button } from '../../../components/Button'
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native'
 import { useRouter } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -12,12 +11,16 @@ type ConfigItemProps = {
 
 function ConfigItem({ icon, label, onPress }: ConfigItemProps) {
     return (
-        <View style={styles.configItem}>
+        <Pressable
+            style={({ pressed }) => [
+                styles.configItem,
+                pressed && styles.configItemPressed,
+            ]}
+            onPress={onPress}
+        >
             {icon}
-            <View style={{ flex: 1 }}>
-                <Button variant='white' label={label} onPress={onPress} />
-            </View>
-        </View>
+            <Text style={styles.configLabel}>{label}</Text>
+        </Pressable>
     )
 }
 
@@ -25,16 +28,16 @@ export default function AppConfig(){
     const router = useRouter()
 
     return (
-        <View style = {styles.container}>
+        <View style={styles.container}>
             <ScrollView
-                style={{flex: 1, width: '100%'}}
+                style={{ flex: 1, width: '100%' }}
                 contentContainerStyle={styles.content}
             >
                 <View style={styles.configBox}>
                     <ConfigItem
                         icon={<Feather name='lock' size={28} color='#31AEAE' />}
                         label='Conta e Dados (Perfil)'
-                        onPress={() => router.push('/home/profile')}
+                        onPress={() => router.navigate({ pathname: '/home/profile', params: { from: 'appConfig' } })}
                     />
                     <ConfigItem
                         icon={<Feather name='bell' size={28} color='#31AEAE' />}
@@ -66,7 +69,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    
     content: {
         flexGrow: 1,
         alignItems: 'center',
@@ -74,22 +76,30 @@ const styles = StyleSheet.create({
         paddingVertical: 20,
         paddingBottom: 100,
     },
-    configButton: {
-        backgroundColor: '#fff',
-        justifyContent: 'center',
-        borderRadius: 21,
-    },
-     configBox: {
+    configBox: {
         backgroundColor: '#fff',
         borderRadius: 21,
-        padding: 10,
+        paddingBottom: 20,
+        paddingTop: 20,
         width: '90%',
-        gap: 8,
     },
     configItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        padding: 6,
-    }
-}) 
+        justifyContent: 'flex-start',
+        gap: 33,
+        minHeight: 50,
+        paddingHorizontal: 20,
+        margin: 22,
+        borderRadius: 21,
+    },
+    configItemPressed: {
+        opacity: 0.6,
+    },
+    configLabel: {
+        flex: 1,
+        fontSize: 24,
+        textAlign: 'left',
+        color: '#05534E',
+    },
+})

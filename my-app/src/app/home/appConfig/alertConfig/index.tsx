@@ -8,6 +8,8 @@ import {
 } from '../../../../services/alertSettings'
 import { cancelAllMedicationAlerts } from '../../../../notifications/scheduler'
 import { rescheduleAllMedications } from '../../../../services/rescheduleAll'
+import { useBox } from '../../../../hooks/useBox'
+import { enviarConfigCaixa } from '../../../../services/boxSettings'
 
 type SwitchRowProps = {
     label: string
@@ -40,6 +42,13 @@ export default function AlertConfig() {
     useEffect(() => {
         getAlertSettings().then(setSettings)
     }, [])
+
+    const { box } = useBox()
+
+    useEffect(() => {
+    if (!settings || !box?.id) return
+    enviarConfigCaixa(box.id, settings).catch(() => {})
+    }, [box?.id, settings?.sound, settings?.light])
 
     const toggle = async (key: keyof AlertSettings) => {
         if (!settings || syncing) return
@@ -105,10 +114,10 @@ export default function AlertConfig() {
                         disabled={syncing}
                     />
                     <SwitchRow
-                        label='Conflito de Slot'
+                        label='Conflito de Compartimento'
                         value={settings.slotConflict}
                         onChange={() => toggle('slotConflict')}
-                        disabled={syncing}
+                        disabled={true}
                     />
                     <SwitchRow
                         label='Vibração'

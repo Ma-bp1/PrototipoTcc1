@@ -8,8 +8,8 @@ import { Button } from '../../../components/Button'
 import { useForm, Controller, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { medSchema, type MedData } from '../../../schemas/medSchema'
-import { useState, useEffect } from 'react'
-import { useRouter, Stack, useLocalSearchParams } from 'expo-router'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter, Stack, useLocalSearchParams, useFocusEffect } from 'expo-router'
 
 import {db, auth} from '../../../config/firebaseConfig'
 import {collection, addDoc, getDoc, updateDoc, doc} from 'firebase/firestore'
@@ -32,6 +32,20 @@ const DAYS = [
   { label: 'S', value: 5 },
   { label: 'S', value: 6 },
 ];
+
+const EMPTY_FORM: MedData = {
+    medName: '',
+    medSlot: undefined as any,
+    medRepetitions: { type: 'diario' },
+    medTime: '16:01',
+    medStock: 0,
+    medStockConsumption: 0,
+    medAdminRoute: '',
+    medDesc: '',
+    medIcon: 'pill-round',
+    medPhoto: null,
+    medIconColor: DEFAULT_ICON_COLOR,
+  }
 
 function getTimes(data: MedData): string[] {
     const match = /^(\d{1,2}):(\d{2})$/.exec(data.medTime ?? '');
@@ -71,20 +85,26 @@ export default function AddMed(){
 
     const {control, handleSubmit, watch, setValue, reset, formState: {errors}} = useForm<MedData>({
         resolver: zodResolver(medSchema),
-        defaultValues: {
-            medName: '', 
-            medSlot: undefined, 
-            medRepetitions: {type: 'diario'}, 
-            medTime: '', 
-            medStock: 0, 
-            medStockConsumption: 0, 
-            medAdminRoute: '', 
-            medDesc: '', 
-            medIcon: 'pill-round',
-            medPhoto: null,
-            medIconColor: DEFAULT_ICON_COLOR,
-        }   
+        defaultValues: EMPTY_FORM 
     })
+
+    useFocusEffect(
+        useCallback(() => {
+         
+          return () => {
+            
+            if (!isEditing) {
+              reset(EMPTY_FORM)
+            }
+          }
+        }, [isEditing])
+    )
+
+    useEffect(() => {
+        if (!isEditing) {
+            reset(EMPTY_FORM)
+        }
+    }, [medicineId])
 
     const medPhoto = watch('medPhoto')
 
@@ -179,6 +199,7 @@ export default function AddMed(){
                 const caixa = await sincronizarCaixa();
 
                 Alert.alert('Medicamento cadastrado com sucesso.', mensagemCaixa(caixa));
+                reset(EMPTY_FORM)
                 router.push('/home');
             }
 
@@ -331,20 +352,20 @@ export default function AddMed(){
                     </View>
                     
 
-                    <AppText>Slot:</AppText>
+                    <AppText>Compartimento:</AppText>
                     <Controller
                         control={control}
                         name="medSlot" 
                         render={({ field: { value, onChange } }) => (
                             <CustomDropdown
-                                label="Slot"
+                                label="Compartimento"
                                 options={[
-                                    { label: 'Slot 1', value: 'slot_1' },
-                                    { label: 'Slot 2', value: 'slot_2' },
-                                    { label: 'Slot 3', value: 'slot_3' },
-                                    { label: 'Slot 4', value: 'slot_4' },
-                                    { label: 'Slot 5', value: 'slot_5' },
-                                    { label: 'Slot 6', value: 'slot_6' },
+                                    { label: 'Compartimento 1', value: 'slot_1' },
+                                    { label: 'Compartimento 2', value: 'slot_2' },
+                                    { label: 'Compartimento 3', value: 'slot_3' },
+                                    { label: 'Compartimento 4', value: 'slot_4' },
+                                    { label: 'Compartimento 5', value: 'slot_5' },
+                                    { label: 'Compartimento 6', value: 'slot_6' },
                                 ]}
                                 selectedValue={value}
                                 onSelect={onChange}
@@ -412,7 +433,7 @@ export default function AddMed(){
                                 />
                             )}
                         />
-                        {errors.medName && <AppText>{errors.medName.message}</AppText>}
+                        {errors.medDesc && <AppText>{errors.medDesc.message}</AppText>}
                     </View>
 
                     <AppText> Ícone: </AppText>

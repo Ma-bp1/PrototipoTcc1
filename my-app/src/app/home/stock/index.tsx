@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect } from 'expo-router' // se não usa expo-router: '@react-navigation/native'
 import { AppText } from '@/src/components/AppText'
@@ -7,7 +7,8 @@ import { Medication } from '@/src/schemas/medSchema'
 import { useMedications } from '@/src/hooks/useMedication'
 import { updateMedication } from '@/src/services/medicationService'
 import { MedIconBox } from '../../../components/MedIconBox'
-
+import { sendStockToBox } from '@/src/services/boxService'
+import { useBox } from '@/src/hooks/useBox'
 
 type StockSlotsProps = {
     medications: Medication[]
@@ -31,7 +32,7 @@ function StockSlots({ medications, onChangeStock }: StockSlotsProps) {
 
                         <View style={styles.slotInfo}>
                             <View style={styles.slotHeaderRow}>
-                                <AppText style={styles.slotTitle}>Slot {slotNumber}</AppText>
+                                <AppText style={styles.slotTitle}>Compartimento {slotNumber}</AppText>
                             </View>
 
                             {med ? (
@@ -51,7 +52,7 @@ function StockSlots({ medications, onChangeStock }: StockSlotsProps) {
                                     </AppText>
                                 </>
                             ) : (
-                                <AppText>Slot vazio</AppText>
+                                <AppText>Vazio</AppText>
                             )}
                         </View>
                     </View>
@@ -73,6 +74,11 @@ export default function Stock() {
     )
 
     // Ajuste manual do estoque (ex.: o usuário repôs a cartela)
+    const { boxId } = useBox()
+
+    // um timer por remédio: se o usuário tocar no +/- várias vezes, só o valor final vai para a caixa
+    const sendTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+
     const handleChangeStock = async (med: Medication, newStock: number) => {
         // atualiza na tela na hora
         setMedications((list) =>
@@ -85,7 +91,17 @@ export default function Stock() {
             console.error('Erro ao salvar estoque:', error)
             Alert.alert('Não foi possível salvar o estoque.')
             refetch() // volta pro valor real do banco
+            return
         }
+
+        // avisa a caixa (com debounce de 600 ms)
+        clearTimeout(sendTimers.current[med.id])
+        sendTimers.current[med.id] = setTimeout(() => {
+            if (!boxId) return
+            sendStockToBox(boxId, med.medSlot, newStock).catch((e) =>
+                console.error('Erro ao enviar estoque para a caixa:', e)
+            )
+        }, 600)
     }
 
     return (

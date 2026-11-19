@@ -1,6 +1,6 @@
-import { View, ScrollView, StyleSheet, Image } from 'react-native'
-import { useCallback } from 'react'
-import { useFocusEffect } from 'expo-router'
+import { View, ScrollView, StyleSheet, Image, Pressable } from 'react-native'
+import { useCallback, useEffect } from 'react'
+import { useFocusEffect, useRouter } from 'expo-router'
 
 import { AppText } from '../../components/AppText'
 import LembreteCards from '../../components/LembreteCards'
@@ -8,12 +8,8 @@ import { HomeSlots } from '../../components/HomeSlots'
 import { useMedications } from '../../hooks/useMedication'
 import { useDoseActions } from '../../hooks/useDoseActions'
 import { useBox } from '../../hooks/useBox'
-
-const STATUS = {
-    online:  { label: 'Ligada',    cor: '#198289', fundo: '#E3F7F5' },
-    standby: { label: 'Em espera', cor: '#C98A0B', fundo: '#FFF4DB' },
-    offline: { label: 'Desligada', cor: '#8A9796', fundo: '#EEF1F1' },
-}
+import { limparNotificacoesOrfas } from '../../notifications/scheduler'
+import { STATUS } from '../../hooks/useBox'
 
 export default function Home() {
     const { status } = useBox()
@@ -26,7 +22,15 @@ export default function Home() {
         }, [refetch])
     )
 
+    useEffect(() => {
+        // só limpa quando já tem a lista carregada
+        if (medications.length === 0) return
+        limparNotificacoesOrfas(medications.map((m) => m.id))
+    }, [medications])
+
     const { label, cor, fundo } = STATUS[status]
+
+    const route = useRouter()
 
     return (
         <View style={styles.container}>
@@ -40,10 +44,12 @@ export default function Home() {
 
                     <AppText style={styles.title}>Caixa Organizadora</AppText>
 
-                    <View style={[styles.badge, { backgroundColor: fundo }]}>
+                    <Pressable 
+                        onPress={() => route.push('/home/boxConfig')}
+                        style={[styles.badge, { backgroundColor: fundo }]}>
                         <View style={[styles.dot, { backgroundColor: cor }]} />
                         <AppText style={[styles.badgeText, { color: cor }]}>{label}</AppText>
-                    </View>
+                    </Pressable>
                 </View>
 
                 <AppText style={styles.section}>Lembretes</AppText>
@@ -53,7 +59,7 @@ export default function Home() {
                     onAdiar={adiarDose}
                 />
 
-                <AppText style={styles.section}>Slots da Caixa</AppText>
+                <AppText style={styles.section}>Compartimentos da Caixa</AppText>
                 <HomeSlots
                     medications={medications}
                     onDeleted={(id) => setMedications((prev) => prev.filter((m) => m.id !== id))}

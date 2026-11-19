@@ -16,7 +16,8 @@ import { AppText } from './AppText'
 import { router } from 'expo-router'
 import { cancelMedication } from '../notifications/scheduler'
 import { enviarAgendaParaCaixa } from '../hooks/useBox'
-import { MedIconBox } from './MedIconBox'
+import { MedIconBox } from '../components/MedIconBox'
+
 
 type HomeSlotsProps = {
     medications: Medication[]
@@ -124,8 +125,8 @@ export function HomeSlots({ medications, onDeleted }: HomeSlotsProps) {
                         <MedIconBox med={med}/>
 
                         <View style={styles.slotInfo}>
-                            <View style={styles.slotHeaderRow}>
-                                <AppText style={styles.slotTitle}>Slot {slotNumber}</AppText>
+                            <View style={styles.slotHeader}>
+                                <AppText style={styles.slotTitle}>Compartimento {slotNumber}</AppText>
                                 {isLowStock && (
                                     <Pressable
                                         style={styles.lowStockBadge}
@@ -215,10 +216,9 @@ const styles = StyleSheet.create({
     slotInfo: {
         flex: 1,
     },
-    slotHeaderRow: {
-        flexDirection: 'row',
+    slotHeader: {
         justifyContent: 'space-between',
-        alignItems: 'center',
+        
         marginBottom: 4,
     },
     slotTitle: {
@@ -233,6 +233,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 10,
+        marginRight: 80,
     },
     lowStockText: {
         color: '#fff',

@@ -9,10 +9,12 @@ import { Checkbox } from 'expo-checkbox'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 
-import { createUserWithEmailAndPassword, signOut } from 'firebase/auth'
+import { createUserWithEmailAndPassword, signOut, updateProfile } from 'firebase/auth'
 import { auth, db } from '../../config/firebaseConfig'
 import { signUpSchema, type SignUpData } from '../../schemas/authSchema'
 import { PasswordInput } from '@/src/components/PasswordInput'
+import { doc, setDoc } from 'firebase/firestore'
+
 
 export default function signUp(){
 
@@ -33,6 +35,15 @@ export default function signUp(){
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, data.password)
             const user = userCredential.user
+
+            // Salva nome no perfil do Auth
+            await updateProfile(user, { displayName: data.fullName.trim() })
+
+            // Salva nome e IP no Firestore, com o uid como ID do documento
+            await setDoc(doc(db, 'users', user.uid), {
+                fullName: data.fullName.trim(),
+                ipBox: data.ipBox.trim(),
+            })
 
             console.log('Usuário cadastrado com sucesso. Credenciais:', userCredential.user)
 
@@ -186,7 +197,7 @@ export default function signUp(){
                         onValueChange={setChecked}
                     />
                     <Link href={'/politicaPrivacidade'}>
-                        <AppText fontSize={18}>
+                        <AppText fontSize={18} style={{textDecorationLine: 'underline'}}>
                             Concordo com a política de segurança e termos de uso do Chronomedi.
                         </AppText>
                     </Link>
@@ -197,6 +208,7 @@ export default function signUp(){
                 <Button
                     label={isLoading ? 'Aguarde...' : 'Cadastrar'}
                     onPress={ handleSubmit(handleSignUpData) }
+                    disabled={isLoading || !isChecked}
                 />
             </ScrollView>
         </KeyboardAvoidingView>

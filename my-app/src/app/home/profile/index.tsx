@@ -6,19 +6,20 @@ import { useRouter } from 'expo-router'
 import { onAuthStateChanged, signOut, updatePassword, getAuth } from 'firebase/auth'
 import { doc, getDoc, getFirestore, setDoc, deleteDoc } from 'firebase/firestore'
 import { z } from 'zod'
-
-import { Button } from '../../../components/Button'
 import { auth } from '../../../config/firebaseConfig'
 import { Input } from '@/src/components/Input'
 import { AppText } from '@/src/components/AppText'
 import { loginSchema } from '@/src/schemas/authSchema'
 import { PasswordInput } from '../../../components/PasswordInput'
+import { cancelAllMedicationAlerts } from '@/src/notifications/scheduler'
 
 const db = getFirestore(auth.app)
 
 const TEAL = '#1E8A8A'
 const TEAL_DARK = '#0F5C5C'
+const TEAL_SOFT = '#E6F3F3'
 const PINK = '#E5566D'
+const PINK_SOFT = '#FDECEF'
 
 type FieldKey = 'fullName' | 'email' | 'password' | 'ipBox'
 
@@ -32,6 +33,14 @@ type FieldConfig = {
     secure?: boolean
     isPassword?: boolean
 }
+
+type ActionButtonProps = {
+    label: string
+    onPress: () => void
+    icon: keyof typeof Feather.glyphMap
+    variant: 'primary' | 'secondary' | 'danger'
+}
+
 
 // Configuração de cada campo: rótulos, validação (reaproveita o authSchema) e mensagem de erro
 const FIELDS: Record<FieldKey, FieldConfig> = {
@@ -126,6 +135,32 @@ function ProfileField({ config, value, editing, draft, onChangeDraft, onPressEdi
 async function sendEmailVerification(newEmail: string) {
      
     console.log('[TODO] enviar verificação para:', newEmail)
+}
+
+const BUTTON_COLORS = {
+    primary: { bg: TEAL, border: TEAL, text: '#fff' },
+    secondary: { bg: '#fff', border: TEAL, text: TEAL },
+    danger: { bg: PINK_SOFT, border: PINK_SOFT, text: PINK },
+}
+
+function ActionButton({ label, onPress, icon, variant }: ActionButtonProps) {
+    const colors = BUTTON_COLORS[variant]
+
+    return (
+        <Pressable
+            onPress={onPress}
+            style={({ pressed }) => [
+                styles.actionButton,
+                { backgroundColor: colors.bg, borderColor: colors.border },
+                pressed && styles.actionButtonPressed,
+            ]}
+        >
+            <Feather name={icon} size={18} color={colors.text} />
+            <Text style={[styles.actionButtonText, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
+                {label}
+            </Text>
+        </Pressable>
+    )
 }
 
 export default function Profile() {
@@ -274,6 +309,7 @@ export default function Profile() {
 
     async function handleLogout() {
         try {
+            await cancelAllMedicationAlerts() // cancela notificações agendadas
             await signOut(auth)
             router.replace('/login')
             Alert.alert('Deslogado com sucesso.')
@@ -321,16 +357,14 @@ export default function Profile() {
         } catch (error: any) {
             console.error('Erro ao deletar:', error);
 
-            // Corrigido de 'auth?requires-recent-login' para 'auth/requires-recent-login'
             if (error.code === 'auth/requires-recent-login') {
                 Alert.alert(
                     "Sessão Expirada",
                     "Por motivos de segurança, por favor faça login novamente para confirmar a exclusão da sua conta.",
-                    [ // <--- Aqui faltava a vírgula antes deste array!
+                    [
                         {
                             text: 'OK',
                             onPress: async () => {
-                                // Como estamos no modular, usamos signOut(auth) em vez de auth().signOut()
                                 await signOut(auth);
 
                                 router.navigate('/login');
@@ -364,12 +398,21 @@ export default function Profile() {
                     )}
                 </View>
 
-                <Pressable onPress={handlePickImage} hitSlop={10} style={styles.avatarEdit}>
-                    <Feather name="edit" size={22} color={PINK} />
+                <Pressable
+                    onPress={handlePickImage}
+                    hitSlop={10}
+                    style={({ pressed }) => [styles.avatarEdit, pressed && styles.actionButtonPressed]}
+                >
+                    <Feather name="camera" size={18} color="#fff" />
                 </Pressable>
             </View>
 
             <Text style={styles.welcome}>Seja Bem Vindo(a)</Text>
+
+            <View style={styles.premiumBadge}>
+                <Feather name="star" size={13} color={TEAL_DARK} />
+                <Text style={styles.premiumBadgeText}>Conta Premium</Text>
+            </View>
 
             {/* Dados */}
             <View style={styles.card}>
@@ -388,9 +431,19 @@ export default function Profile() {
             </View>
 
             <View style={styles.buttons}>
-                <Button label="Assinar Premium" variant="red" onPress={() => Alert.alert('Essa conta já possui premium.')} />
-                <Button label="Sair da Conta" variant="red" onPress={handleLogout} />
-                <Button label='Excluir conta permanentemente' variant='red' onPress={confirmDelete} />
+                <ActionButton
+                    variant="primary"
+                    icon="star"
+                    label="Assinar Premium"
+                    onPress={() => Alert.alert('Essa conta já possui premium.')}
+                />
+                <ActionButton variant="secondary" icon="log-out" label="Sair da Conta" onPress={handleLogout} />
+                <ActionButton
+                    variant="danger"
+                    icon="trash-2"
+                    label="Excluir conta permanentemente"
+                    onPress={confirmDelete}
+                />
             </View>
         </ScrollView>
     )
@@ -404,36 +457,67 @@ const styles = StyleSheet.create({
     container: {
         alignItems: 'center',
         paddingTop: 24,
-        paddingBottom: 120,
+        paddingBottom: 150,
         paddingHorizontal: 20,
     },
     avatarWrapper: {
         width: 192,
         height: 192,
     },
+    // Sem overflow: 'hidden' aqui, senão a sombra some no iOS. O recorte circular fica na imagem.
     avatar: {
         width: 192,
         height: 192,
         borderRadius: 96,
-        overflow: 'hidden',
-        backgroundColor: '#E0E8E8',
+        backgroundColor: TEAL_SOFT,
+        borderWidth: 5,
+        borderColor: '#fff',
         alignItems: 'center',
         justifyContent: 'center',
+        shadowColor: TEAL_DARK,
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 6 },
+        elevation: 6,
     },
     avatarImage: {
         width: '100%',
         height: '100%',
+        borderRadius: 96,
     },
     avatarEdit: {
         position: 'absolute',
-        right: 0,
-        bottom: 0,
-        padding: 4,
+        right: 8,
+        bottom: 8,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: PINK,
+        borderWidth: 3,
+        borderColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        elevation: 7,
     },
     welcome: {
         marginTop: 8,
         fontSize: 18,
         fontWeight: '800',
+        color: TEAL_DARK,
+    },
+    premiumBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 10,
+        paddingVertical: 5,
+        paddingHorizontal: 12,
+        borderRadius: 14,
+        backgroundColor: TEAL_SOFT,
+    },
+    premiumBadgeText: {
+        fontSize: 12,
+        fontWeight: '700',
         color: TEAL_DARK,
     },
     card: {
@@ -467,6 +551,24 @@ const styles = StyleSheet.create({
         width: '100%',
         marginTop: 24,
         gap: 12,
+    },
+    actionButton: {
+        width: '100%',
+        height: 52,
+        paddingHorizontal: 16,
+        borderRadius: 26,
+        borderWidth: 1.5,
+        flexDirection: 'row',
+        gap: 10,
         alignItems: 'center',
+        justifyContent: 'center',
+    },
+    actionButtonPressed: {
+        opacity: 0.85,
+    },
+    actionButtonText: {
+        fontSize: 16,
+        fontWeight: '700',
+        textAlign: 'center',
     },
 })
