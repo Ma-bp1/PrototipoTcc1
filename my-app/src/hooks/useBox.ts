@@ -40,6 +40,7 @@ function montarAgenda(meds: Medication[], antecedenciaMin: number) {
             led: true,    // AJUSTE: troque pelos valores da sua tela de alertas, se existirem
             buzzer: true,
             a: antecedenciaMin,
+            c: med.medStockConsumption, // consumo por dose
         }
         const rep = med.medRepetitions
 
@@ -215,5 +216,5 @@ export function useBox(onEvento?: (ev: EventoCaixa) => void) {
         }
     }
 
-    return { box, online, ultimaSync, carregando, vincular, sincronizar, status }
+    return { box, boxId: box?.id as string | undefined, online, ultimaSync, carregando, vincular, sincronizar, status }
 }
