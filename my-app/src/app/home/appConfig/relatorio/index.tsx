@@ -296,8 +296,8 @@ export default function RelatorioUsoMedicamentoScreen() {
 
 const styles = StyleSheet.create({
     safe: { flex: 1 },
-    conteudo: { flex: 1, backgroundColor: cores.fundo },
-    conteudoInterno: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 },
+    conteudo: { flex: 1, backgroundColor: cores.fundo},
+    conteudoInterno: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 200 },
     ajuda: { position: 'absolute', top: 16, right: 16, zIndex: 1 },
     tituloPeriodo: { fontWeight: '600', marginBottom: 8, paddingRight: 36 },
     ultimaExclusao: { marginBottom: 12, marginLeft: 4 },
