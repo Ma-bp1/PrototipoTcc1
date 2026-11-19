@@ -16,7 +16,7 @@ import { AppText } from './AppText'
 import { router } from 'expo-router'
 import { cancelMedication } from '../notifications/scheduler'
 import { enviarAgendaParaCaixa } from '../hooks/useBox'
-import { MedIconBox } from './medIconBox'
+import { MedIconBox } from './MedIconBox'
 
 type HomeSlotsProps = {
     medications: Medication[]
