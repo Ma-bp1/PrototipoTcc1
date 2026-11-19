@@ -5,6 +5,7 @@ import { auth, db } from '../config/firebaseConfig'
 import { getMedications } from '../services/medicationService' // AJUSTE só se o nome do arquivo for outro
 import { Medication } from '../schemas/medSchema'
 import { onAuthStateChanged } from 'firebase/auth'
+import { getAlertSettings } from '@/src/services/alertSettings'
 
 export const STATUS = {
     online:  { label: 'Ligada',    cor: '#198289', fundo: '#E3F7F5' },
@@ -22,7 +23,7 @@ export type EventoCaixa = {
 // Transforma os medicamentos no formato que a caixa entende.
 // Cada item = um horário de alarme:
 // { s: slot, h: hora, m: minuto, n: nome, d: dose, q: estoque, led, buzzer, w?: dias da semana }
-function montarAgenda(meds: Medication[]) {
+function montarAgenda(meds: Medication[], antecedenciaMin: number) {
     const agenda: any[] = []
 
     for (const med of meds) {
@@ -38,6 +39,7 @@ function montarAgenda(meds: Medication[]) {
             q: med.medStock,
             led: true,    // AJUSTE: troque pelos valores da sua tela de alertas, se existirem
             buzzer: true,
+            a: antecedenciaMin,
         }
         const rep = med.medRepetitions
 
@@ -68,10 +70,12 @@ export async function enviarAgendaParaCaixa() {
 
     const snap = await getDocs(query(collection(db, 'boxes'), where('ownerUid', '==', uid)))
     if (snap.empty) return false // nenhuma caixa vinculada a esta conta
-
-    const meds = await getMedications()
+    
+    const [meds, cfg] = await Promise.all([getMedications(), getAlertSettings()])
+    const antecedencia = cfg?.advance5 ? 5 : 0
+    
     await updateDoc(snap.docs[0].ref, {
-        agendaJson: JSON.stringify(montarAgenda(meds)),
+        agendaJson: JSON.stringify(montarAgenda(meds, antecedencia)),
         agendaAt: String(Date.now()),
     })
     return true

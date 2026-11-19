@@ -3,7 +3,7 @@ import { View, ScrollView, Switch, StyleSheet, TextInput, Pressable, ActivityInd
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Button } from '../../../components/Button'
 import { AppText } from '../../../components/AppText'
-import { useBox, STATUS } from '../../../hooks/useBox'
+import { useBox, STATUS, enviarAgendaParaCaixa } from '../../../hooks/useBox'
 import { AlertSettings, getAlertSettings, saveAlertSettings } from '@/src/services/alertSettings'
 import { rescheduleAllMedications } from '@/src/services/rescheduleAll'
 
@@ -16,6 +16,7 @@ const cores = {
     divisor: '#E6E6E6',
     textoSecundario: '#6B6B6B',
 }
+
 
 export default function BoxConfigScreen() {
     const [settings, setSettings] = useState<AlertSettings | null>(null)
@@ -32,6 +33,7 @@ export default function BoxConfigScreen() {
     try {
         await saveAlertSettings(novo)
         if (novo.medAlert) await rescheduleAllMedications()
+        await enviarAgendaParaCaixa().catch(() => {})
     } catch {
         setSettings(anterior)
         await saveAlertSettings(anterior).catch(() => {})

@@ -114,10 +114,10 @@ export default function AlertConfig() {
                         disabled={syncing}
                     />
                     <SwitchRow
-                        label='Conflito de Slot'
+                        label='Conflito de Compartimento'
                         value={settings.slotConflict}
                         onChange={() => toggle('slotConflict')}
-                        disabled={syncing}
+                        disabled={true}
                     />
                     <SwitchRow
                         label='Vibração'

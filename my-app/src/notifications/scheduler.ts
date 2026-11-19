@@ -42,6 +42,48 @@ const hhmm = (ms: number) => {
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 };
 
+// Evita repetir o aviso imediato da mesma dose (scheduleMedication roda várias vezes)
+const avisadosAgora = new Set<string>();
+
+// Próxima ocorrência de um dia da semana (0 = domingo) + "HH:mm", em ms
+function nextWeekly(day: number, time: string) {
+  const [h, m] = time.split(':').map(Number);
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  while (d.getDay() !== day || d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+  return d.getTime();
+}
+
+// Se a dose está a menos de 5 min, o aviso normal já passou: avisa agora
+async function avisarAgora(
+  N: NonNullable<ReturnType<typeof getNotifications>>,
+  med: Med,
+  doseMs: number
+) {
+  const agora = Date.now();
+  if (doseMs <= agora || doseMs - 5 * 60 * 1000 > agora) return; // fora da janela
+
+  const key = `${med.id}-${doseMs}`;
+  if (avisadosAgora.has(key)) return;
+  avisadosAgora.add(key);
+
+  const faltam = Math.max(1, Math.ceil((doseMs - agora) / 60000));
+  await N.scheduleNotificationAsync({
+    identifier: `${med.id}-${doseMs}-adv-now`,
+    content: {
+      title: `Daqui a ${faltam} min`,
+      body: `${med.name} às ${hhmm(doseMs)}`,
+      data: { medId: med.id, advance: true },
+    },
+    trigger: {
+      type: N.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: 2,
+      repeats: false,
+      channelId: CHANNEL,
+    },
+  });
+}
+
 export async function scheduleMedication(med: Med) {
   const N = getNotifications();
   if (!N) return;
@@ -75,7 +117,7 @@ export async function scheduleMedication(med: Med) {
         },
       });
 
-      // aviso 5 min antes (só se ainda não passou)
+      // aviso 5 min antes
       const avisoMs = doseMs - 5 * 60 * 1000;
       if (avisar5 && avisoMs > Date.now()) {
         await N.scheduleNotificationAsync({
@@ -91,6 +133,8 @@ export async function scheduleMedication(med: Med) {
             channelId: CHANNEL,
           },
         });
+      } else if (avisar5) {
+        await avisarAgora(N, med, doseMs);   // NOVO: dose dentro da janela de 5 min
       }
     }
     return;
@@ -142,6 +186,8 @@ export async function scheduleMedication(med: Med) {
               channelId: CHANNEL,
             },
           });
+
+          await avisarAgora(N, med, nextWeekly(day, time));   // NOVO
         }
       }
     } else {
@@ -167,6 +213,8 @@ export async function scheduleMedication(med: Med) {
             channelId: CHANNEL,
           },
         });
+
+        await avisarAgora(N, med, nextOccurrence(time));   // NOVO
       }
     }
   }

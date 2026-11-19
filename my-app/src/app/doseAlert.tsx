@@ -358,7 +358,7 @@ export default function DoseAlert() {
                 )}
                 {!!med.medAdminRoute && <InfoRow label="Via" value={med.medAdminRoute} />}
                 {!!med.medSlot && (
-                  <InfoRow label="Compartimento" value={`Slot ${slotNumber(med.medSlot)}`} />
+                  <InfoRow label="Compartimento" value={`Compartimento ${slotNumber(med.medSlot)}`} />
                 )}
                 {!!repeatLabel && <InfoRow label="Repetição" value={repeatLabel} />}
               </View>

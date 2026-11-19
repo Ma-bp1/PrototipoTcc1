@@ -352,20 +352,20 @@ export default function AddMed(){
                     </View>
                     
 
-                    <AppText>Slot:</AppText>
+                    <AppText>Compartimento:</AppText>
                     <Controller
                         control={control}
                         name="medSlot" 
                         render={({ field: { value, onChange } }) => (
                             <CustomDropdown
-                                label="Slot"
+                                label="Compartimento"
                                 options={[
-                                    { label: 'Slot 1', value: 'slot_1' },
-                                    { label: 'Slot 2', value: 'slot_2' },
-                                    { label: 'Slot 3', value: 'slot_3' },
-                                    { label: 'Slot 4', value: 'slot_4' },
-                                    { label: 'Slot 5', value: 'slot_5' },
-                                    { label: 'Slot 6', value: 'slot_6' },
+                                    { label: 'Compartimento 1', value: 'slot_1' },
+                                    { label: 'Compartimento 2', value: 'slot_2' },
+                                    { label: 'Compartimento 3', value: 'slot_3' },
+                                    { label: 'Compartimento 4', value: 'slot_4' },
+                                    { label: 'Compartimento 5', value: 'slot_5' },
+                                    { label: 'Compartimento 6', value: 'slot_6' },
                                 ]}
                                 selectedValue={value}
                                 onSelect={onChange}
