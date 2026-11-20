@@ -1,21 +1,37 @@
-import { useEffect, useState } from 'react';
-import { View, Text, Pressable, Vibration, StyleSheet, ActivityIndicator } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  Vibration,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  BackHandler,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { doc, getDoc } from 'firebase/firestore';
 
 import { auth, db } from '../config/firebaseConfig';
-import { snoozeMedication, cancelSnooze } from '../notifications/scheduler';
 import { getAlertSettings } from '../services/alertSettings';
-import { confirmDoseInDb, snoozeDoseInDb } from '../services/doseService';
 import type { MedData } from '../schemas/medSchema';
+import { useDoseActions } from '../hooks/useDoseActions';
+import { cancelMedication } from '../notifications/scheduler';
 
 const SNOOZE_MINUTES = 5;
+const MAX_AUTO_SNOOZES = 3; // nº de adiamentos automáticos antes de marcar como perdida
+const AUTO_TIMEOUT_MS = 120_000; // 2 min sem resposta
+const KEEP_AWAKE_TAG = 'dose-alert';
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 // Documento do Firestore = MedData (mesmo schema do AddMed)
 type StoredMed = MedData;
+
+const noop = () => {};
 
 function formatRepeat(rep: MedData['medRepetitions']) {
   switch (rep.type) {
@@ -71,7 +87,6 @@ function withTimeout<T>(p: Promise<T>, ms = 3000) {
 }
 
 export default function DoseAlert() {
-
   // notificação normal traz `time` ("15:30"); a de adiamento traz `doseMs`
   const { medId, time, doseMs: doseMsParam } = useLocalSearchParams<{
     medId: string;
@@ -82,14 +97,46 @@ export default function DoseAlert() {
 
   const [med, setMed] = useState<StoredMed | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [askingSkip, setAskingSkip] = useState(false);
+  const [naoExiste, setNaoExiste] = useState(false);
 
+  // busyRef bloqueia toque duplo (setBusy é assíncrono); leftRef evita leave() duplicado
+  const busyRef = useRef(false);
+  const leftRef = useRef(false);
+
+  const leaveOnce = useCallback(() => {
+    if (leftRef.current) return;
+    leftRef.current = true;
+    leave();
+  }, []);
+
+  const medList = useMemo(
+    () => (med && medId ? [{ ...med, id: medId }] : []),
+    [med, medId],
+  );
+
+  const { confirmarDose, adiarDose, marcarPerdida } = useDoseActions(medList, noop);
+
+  // Carregamento do medicamento
   useEffect(() => {
+    leftRef.current = false;
+    busyRef.current = false;
+    setBusy(false);
+    setMed(null);
+    setNaoExiste(false);
+    setLoadError(false);
+
     if (!medId) {
+      setLoadError(true);
       setLoading(false);
       return;
     }
+
     let cancelled = false;
+    setLoading(true);
 
     (async () => {
       try {
@@ -97,12 +144,16 @@ export default function DoseAlert() {
         // currentUser pode ser null nos primeiros instantes.
         await auth.authStateReady();
         const userId = auth.currentUser?.uid;
-        if (!userId) return;
+        if (!userId) throw new Error('Sem usuário autenticado');
 
         const snap = await getDoc(doc(db, 'users', userId, 'medications', medId));
-        if (!cancelled && snap.exists()) setMed(snap.data() as StoredMed);
+        if (cancelled) return;
+
+        if (snap.exists()) setMed(snap.data() as StoredMed);
+        else setNaoExiste(true);
       } catch (e) {
         console.warn('Falha ao carregar medicamento', e);
+        if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -111,77 +162,153 @@ export default function DoseAlert() {
     return () => {
       cancelled = true;
     };
-  }, [medId]);
+  }, [medId, reloadKey]);
 
   // Horário agendado da dose (é o que a home guarda em medLastConfirmed)
-  const doseMs = doseMsParam
-    ? Number(doseMsParam)
-    : lastOccurrence(time ?? med?.medTime);
+  const doseMs = useMemo(
+    () => (doseMsParam ? Number(doseMsParam) : lastOccurrence(time ?? med?.medTime)),
+    [doseMsParam, time, med?.medTime],
+  );
 
   // Já confirmada pela home? (medLastConfirmed guarda o horário agendado da dose)
-  const jaConfirmada =
-  !!med?.medLastConfirmed && Number(med.medLastConfirmed) >= doseMs;
+  const jaConfirmada = !!med?.medLastConfirmed && Number(med.medLastConfirmed) >= doseMs;
+
+  // Já marcada como perdida/não administrada?
+  const jaPerdida = !!med?.medLastMissed && Number(med.medLastMissed) >= doseMs;
 
   // Já adiada pela home e o adiamento ainda não venceu?
   // (se veio doseMsParam, é a notificação do próprio adiamento → deve aparecer)
   const adiadaAindaValida =
-  !doseMsParam &&
-  !!med?.medSnoozedUntil && // ← ajuste p/ o campo que o snoozeDoseInDb grava
-  Number(med.medSnoozedUntil) > Date.now();
+    !doseMsParam &&
+    !!med?.medSnoozedUntil && // ← confirme que é o campo que o snoozeDoseInDb grava
+    Number(med.medSnoozedUntil) > Date.now();
 
-  const jaTratada = jaConfirmada || adiadaAindaValida;
-
-  useEffect(() => {
-    if (!loading && jaTratada) leave();
-  }, [loading, jaTratada]);
-
+  const jaTratada = jaConfirmada || adiadaAindaValida || jaPerdida || naoExiste;
+  const ativa = !loading && !loadError && !jaTratada;
 
   useEffect(() => {
-    if (loading || jaTratada) return;
+    if (!loading && jaTratada) leaveOnce();
+  }, [loading, jaTratada, leaveOnce]);
+
+  // Remédio removido: apaga as notificações dele (a saída da tela já é feita acima)
+  useEffect(() => {
+    if (!naoExiste || !medId) return;
+    (async () => {
+      try {
+        await cancelMedication(medId);
+      } catch (e) {
+        console.warn('Falha ao cancelar notificações', e);
+      }
+    })();
+  }, [naoExiste, medId]);
+
+  // Botão/gesto de voltar não pode descartar o alerta sem resposta
+  useEffect(() => {
+    if (loadError) return; // no erro de carregamento o usuário pode fechar
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => sub.remove();
+  }, [loadError]);
+
+  // Mantém a tela acesa enquanto o alerta está ativo (o timer de 2 min depende disso)
+  useEffect(() => {
+    if (!ativa) return;
+    activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => {});
+    return () => {
+      deactivateKeepAwake(KEEP_AWAKE_TAG).catch(() => {});
+    };
+  }, [ativa]);
+
+  // Vibração
+  useEffect(() => {
+    if (!ativa) return;
     let active = true;
-    getAlertSettings().then(({ vibration }) => {
-      if (active && vibration) Vibration.vibrate([0, 500, 300, 500], true);
-    });
+    getAlertSettings()
+      .catch(() => ({ vibration: true })) // se falhar, vibra por padrão
+      .then(({ vibration }) => {
+        if (active && vibration) Vibration.vibrate([0, 500, 300, 500], true);
+      });
     return () => {
       active = false;
       Vibration.cancel();
     };
-  }, [loading, jaTratada]);
+  }, [ativa]);
 
-  const handleConfirm = async () => {
-    if (busy) return;
+  // Executa uma ação de dose com proteção contra toque duplo e falhas
+  const run = async (action: () => Promise<unknown>, opts?: { silent?: boolean }) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
-      if (medId && med) {
-        await cancelSnooze(medId);
-        await withTimeout(confirmDoseInDb(medId, med, doseMs));
-      }
+      await withTimeout(action());
+      leaveOnce();
     } catch (e) {
       console.warn('Falha ao registrar dose', e);
-    } finally {
-      leave();
+      busyRef.current = false;
+      setBusy(false);
+      if (!opts?.silent) {
+        Alert.alert('Erro', 'Não foi possível registrar. Tente novamente.');
+      }
     }
   };
 
-  const handleSnooze = async () => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      if (medId && med) {
-        const untilMs = await snoozeMedication({
-          id: medId,
-          name: med.medName,
-          doseMs,
-          minutes: SNOOZE_MINUTES,
-        });
-        await withTimeout(snoozeDoseInDb(medId, untilMs));
-      }
-    } catch (e) {
-      console.warn('Falha ao adiar', e);
-    } finally {
-      leave();
-    }
+  const handleConfirm = () => {
+    if (!medId) return;
+    run(() => confirmarDose(medId, doseMs));
   };
+
+  const handleSnooze = () => {
+    if (!medId) return;
+    run(() => adiarDose(medId, doseMs, SNOOZE_MINUTES)); // manual → zera contador
+  };
+
+  const handleSkip = () => {
+    if (!medId || busyRef.current) return;
+    setAskingSkip(true); // pausa o timer automático enquanto o alerta está aberto
+
+    Alert.alert(
+      'Dose não administrada',
+      'Deseja registrar que esta dose não foi tomada?',
+      [
+        { text: 'Cancelar', style: 'cancel', onPress: () => setAskingSkip(false) },
+        {
+          text: 'Registrar',
+          style: 'destructive',
+          onPress: () => {
+            setAskingSkip(false);
+            run(() => marcarPerdida(medId, doseMs));
+          },
+        },
+      ],
+      { cancelable: true, onDismiss: () => setAskingSkip(false) },
+    );
+  };
+
+  const handleAutoTimeout = () => {
+    if (!medId || !med) return;
+
+    const anterior = med.medAutoSnooze?.doseMs === doseMs ? med.medAutoSnooze.count : 0;
+    const count = anterior + 1;
+
+    return run(
+      () =>
+        count > MAX_AUTO_SNOOZES
+          ? marcarPerdida(medId, doseMs)
+          : adiarDose(medId, doseMs, SNOOZE_MINUTES, { doseMs, count }),
+      { silent: true },
+    );
+  };
+
+  // Sempre chama a versão mais recente do handler (evita closure velha no timer)
+  const autoTimeoutRef = useRef(handleAutoTimeout);
+  autoTimeoutRef.current = handleAutoTimeout;
+
+  useEffect(() => {
+    if (!ativa || busy || askingSkip) return;
+    const t = setTimeout(() => autoTimeoutRef.current(), AUTO_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [ativa, busy, askingSkip, med]);
+
+  const slotNumber = (slot: string) => slot.replace(/\D/g, '');
 
   const displayTime = doseMsParam
     ? formatHHmm(Number(doseMsParam))
@@ -197,11 +324,20 @@ export default function DoseAlert() {
         { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 },
       ]}
     >
+      <StatusBar style="light" />
+
       <Text style={styles.header}>Lembrete de Administração{'\n'}de Medicamentos</Text>
 
       <View style={styles.center}>
         {loading || jaTratada ? (
           <ActivityIndicator color="#FFFFFF" size="large" />
+        ) : loadError ? (
+          <>
+            <Text style={styles.errorTitle}>Não foi possível carregar o medicamento</Text>
+            <Text style={styles.errorText}>
+              Verifique sua conexão e tente novamente.
+            </Text>
+          </>
         ) : (
           <>
             <Text style={styles.medName} adjustsFontSizeToFit numberOfLines={1}>
@@ -222,7 +358,7 @@ export default function DoseAlert() {
                 )}
                 {!!med.medAdminRoute && <InfoRow label="Via" value={med.medAdminRoute} />}
                 {!!med.medSlot && (
-                  <InfoRow label="Compartimento" value={`Slot ${med.medSlot}`} />
+                  <InfoRow label="Compartimento" value={`Compartimento ${slotNumber(med.medSlot)}`} />
                 )}
                 {!!repeatLabel && <InfoRow label="Repetição" value={repeatLabel} />}
               </View>
@@ -231,23 +367,49 @@ export default function DoseAlert() {
         )}
       </View>
 
-      <View style={styles.actions}>
-        <Pressable
-          onPress={handleConfirm}
-          disabled={busy}
-          style={({ pressed }) => [styles.button, styles.confirm, pressed && styles.pressed]}
-        >
-          <Text style={styles.confirmText}>Confirmar dose</Text>
-        </Pressable>
+      {loadError ? (
+        <View style={styles.actions}>
+          <Pressable
+            onPress={() => setReloadKey((k) => k + 1)}
+            style={({ pressed }) => [styles.button, styles.confirm, pressed && styles.pressed]}
+          >
+            <Text style={styles.confirmText}>Tentar novamente</Text>
+          </Pressable>
 
-        <Pressable
-          onPress={handleSnooze}
-          disabled={busy}
-          style={({ pressed }) => [styles.button, styles.snooze, pressed && styles.pressed]}
-        >
-          <Text style={styles.snoozeText}>Adiar {SNOOZE_MINUTES} minutos</Text>
-        </Pressable>
-      </View>
+          <Pressable
+            onPress={leaveOnce}
+            style={({ pressed }) => [styles.button, styles.skip, pressed && styles.pressed]}
+          >
+            <Text style={styles.skipText}>Fechar</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={styles.actions}>
+          <Pressable
+            onPress={handleConfirm}
+            disabled={busy || !ativa}
+            style={({ pressed }) => [styles.button, styles.confirm, pressed && styles.pressed]}
+          >
+            <Text style={styles.confirmText}>Confirmar dose</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={handleSnooze}
+            disabled={busy || !ativa}
+            style={({ pressed }) => [styles.button, styles.snooze, pressed && styles.pressed]}
+          >
+            <Text style={styles.snoozeText}>Adiar {SNOOZE_MINUTES} minutos</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={handleSkip}
+            disabled={busy || !ativa}
+            style={({ pressed }) => [styles.button, styles.skip, pressed && styles.pressed]}
+          >
+            <Text style={styles.skipText}>Não administrada</Text>
+          </Pressable>
+        </View>
+      )}
     </LinearGradient>
   );
 }
@@ -319,6 +481,18 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginLeft: 16,
   },
+  errorTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  errorText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
   actions: {
     width: '100%',
     alignItems: 'center',
@@ -331,9 +505,34 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
   },
-  confirm: { backgroundColor: '#FFFFFF' },
-  confirmText: { color: '#1B8585', fontSize: 18, fontWeight: '700' },
-  snooze: { backgroundColor: '#FF6B8A' },
-  snoozeText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
+  confirm: {
+    backgroundColor: '#FFFFFF',
+  },
+  confirmText: {
+    color: '#1B8585',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  snooze: {
+    backgroundColor: '#FF6B8A',
+  },
+  snoozeText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  pressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
+  },
+  skip: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.6)',
+  },
+  skipText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });

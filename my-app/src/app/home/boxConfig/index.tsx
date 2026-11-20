@@ -1,9 +1,11 @@
-import { useState } from 'react'
-import { View, ScrollView, Switch, StyleSheet, TextInput } from 'react-native'
+import { useEffect, useState } from 'react'
+import { View, ScrollView, Switch, StyleSheet, TextInput, Pressable, ActivityIndicator, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Button } from '../../../components/Button'
 import { AppText } from '../../../components/AppText'
-import { useBox } from '../../../hooks/useBox'
+import { useBox, STATUS, enviarAgendaParaCaixa } from '../../../hooks/useBox'
+import { AlertSettings, getAlertSettings, saveAlertSettings } from '@/src/services/alertSettings'
+import { rescheduleAllMedications } from '@/src/services/rescheduleAll'
 
 const cores = {
     primaria: '#2DB5B0',
@@ -15,10 +17,33 @@ const cores = {
     textoSecundario: '#6B6B6B',
 }
 
+
 export default function BoxConfigScreen() {
-    const [notificar, setNotificar] = useState(false)
+    const [settings, setSettings] = useState<AlertSettings | null>(null)
+
+    useEffect(() => {
+    getAlertSettings().then(setSettings)
+    }, [])
+
+    const alternarAntecedencia = async (valor: boolean) => {
+    if (!settings) return
+        const anterior = settings
+        const novo = { ...settings, advance5: valor }
+        setSettings(novo)
+    try {
+        await saveAlertSettings(novo)
+        if (novo.medAlert) await rescheduleAllMedications()
+        await enviarAgendaParaCaixa().catch(() => {})
+    } catch {
+        setSettings(anterior)
+        await saveAlertSettings(anterior).catch(() => {})
+        Alert.alert('Não foi possível salvar.', 'Tente novamente.')
+    }
+    }
+
     const [codigo, setCodigo] = useState('')
-    const { box, online, ultimaSync, carregando, vincular, sincronizar } = useBox()
+    const { box, status, ultimaSync, carregando, vincular, sincronizar } = useBox()
+    const { label, cor, fundo } = STATUS[status]
 
     return (
         <SafeAreaView style={styles.safe} edges={['top']}>
@@ -27,79 +52,78 @@ export default function BoxConfigScreen() {
                 contentContainerStyle={styles.conteudoInterno}
                 showsVerticalScrollIndicator={false}
             >
+                {/* Sem caixa vinculada: formulário de vínculo */}
                 {!box && (
                     <View style={styles.card}>
                         <AppText style={styles.rotulo}>Código da caixa (aparece no Monitor Serial)</AppText>
                         <TextInput
                             value={codigo}
                             onChangeText={setCodigo}
+                            placeholderTextColor='#999'
                             autoCapitalize="characters"
                             placeholder="A0B1C2D3E4F5"
                             style={{ backgroundColor: cores.pill, borderRadius: 8, padding: 10, marginVertical: 12 }}
                         />
-                        <Button label={carregando ? 'Vinculando...' : 'Vincular caixa'} variant="blue" onPress={() => vincular(codigo)} />
-
-                        <AppText style={styles.tituloSecao}>Configurações Gerais</AppText>
-
-                        <View style={[styles.bolinha, !online && { backgroundColor: '#B3B3B3' }]} />
-                        <AppText style={styles.pillTexto}>{online ? 'Ligada' : 'Desligada'}</AppText>
-
-                        <Button label={carregando ? 'Sincronizando...' : 'Sincronizar'} variant="blue"
-                                style={styles.botaoSincronizar} onPress={sincronizar} />
-
-                        <AppText style={styles.ultimaSync}>
-                            {ultimaSync ? `Última sincronização feita em ${ultimaSync}` : 'Ainda não sincronizada'}
-                        </AppText>
+                        <Button
+                            label={carregando ? 'Vinculando...' : 'Vincular caixa'}
+                            variant="blue"
+                            onPress={() => vincular(codigo)}
+                        />
                     </View>
                 )}
-                
-                <View style={styles.card}>
-        
-                    <View style={styles.linha}>
-                        <AppText style={styles.rotulo}>Status da Caixa:</AppText>
-                        <View style={styles.colunaValor}>
-                            <View style={styles.pill}>
-                                <View style={styles.bolinha} />
-                                <AppText style={styles.pillTexto}>Ligada</AppText>
+
+                {/* Com caixa vinculada: configurações gerais */}
+                {box && (
+                    <>
+                        <AppText style={styles.tituloSecao}>Configurações Gerais</AppText>
+
+                        <View style={styles.card}>
+                            <View style={styles.linhaStatus}>
+                                <AppText style={styles.rotuloStatus}>Status da caixa</AppText>
+
+                                <View style={[styles.statusPill, { backgroundColor: fundo }]}>
+                                    <View style={[styles.statusBolinha, { backgroundColor: cor }]} />
+                                    <AppText style={[styles.statusTexto, { color: cor }]}>
+                                        {label}
+                                    </AppText>
+                                </View>
                             </View>
+
+                            <View style={styles.divisor} />
+
+                            <Pressable
+                                onPress={sincronizar}
+                                disabled={carregando}
+                                style={({ pressed }) => [
+                                    styles.botaoSync,
+                                    pressed && styles.botaoSyncPressionado,
+                                    carregando && styles.botaoSyncDesabilitado,
+                                ]}
+                            >
+                                {carregando && <ActivityIndicator size="small" color={cores.branco} />}
+                                <AppText style={styles.botaoSyncTexto}>
+                                    {carregando ? 'Sincronizando...' : 'Sincronizar agora'}
+                                </AppText>
+                            </Pressable>
+
+                            <AppText style={styles.ultimaSync}>
+                                {ultimaSync ? `Última sincronização feita em ${ultimaSync}` : 'Ainda não sincronizada'}
+                            </AppText>
                         </View>
-                    </View>
+                    </>
+                )}
 
-              
-                    <View style={styles.linha}>
-                        <AppText style={styles.rotulo}>Bateria:</AppText>
-                        <View style={styles.colunaValor}>
-                            <View style={styles.pill}>
-                                <View style={styles.bateria} />
-                                <AppText style={styles.pillTexto}>100%</AppText>
-                            </View>
-                        </View>
-                    </View>
-
-                    <Button
-                        label="Sincronizar"
-                        variant="blue"
-                        style={styles.botaoSincronizar}
-                    />
-
-                    <AppText style={styles.ultimaSync}>
-                        Última sincronização feita em 08/04/2026
-                    </AppText>
-
-                    <View style={styles.divisor} />
-                </View>
-
-             
-                <AppText style={styles.tituloSecao}>Notificações</AppText>
+                <AppText style={styles.tituloSecao}>Noficações</AppText>
 
                 <View style={[styles.card, styles.cardNotificacao]}>
                     <AppText style={styles.textoNotificacao}>
                         Notificar com 5 minutos de antecedência
                     </AppText>
                     <Switch
-                        value={notificar}
-                        onValueChange={setNotificar}
-                        trackColor={{ false: cores.primaria, true: cores.primaria }}
+                        value={settings?.advance5 ?? false}
+                        onValueChange={alternarAntecedencia}
+                        disabled={!settings}
+                        trackColor={{ false: '#FF6B8A', true: cores.primaria }}
                         ios_backgroundColor={cores.primaria}
                         thumbColor={cores.branco}
                     />
@@ -192,12 +216,6 @@ const styles = StyleSheet.create({
         marginTop: 6,
         marginBottom: 8,
     },
-    ultimaSync: {
-        fontSize: 10,
-        color: cores.textoSecundario,
-        textAlign: 'center',
-        marginBottom: 16,
-    },
     divisor: {
         height: 1,
         backgroundColor: cores.divisor,
@@ -212,5 +230,61 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 16,
         fontWeight: '600',
+    },
+    linhaStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 14,
+    },
+    rotuloStatus: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: cores.texto,
+    },
+    statusPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 999,
+    },
+    statusBolinha: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    statusTexto: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    botaoSync: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: cores.primaria,
+        marginTop: 14,
+    },
+    botaoSyncPressionado: {
+        opacity: 0.85,
+        transform: [{ scale: 0.98 }],
+    },
+    botaoSyncDesabilitado: {
+        opacity: 0.6,
+    },
+    botaoSyncTexto: {
+        color: cores.branco,
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    ultimaSync: {
+        fontSize: 12,
+        color: cores.textoSecundario,
+        textAlign: 'center',
+        marginTop: 10,
     },
 })

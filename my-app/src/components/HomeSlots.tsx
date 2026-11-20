@@ -15,6 +15,11 @@ import { Medication } from '../schemas/medSchema'
 import { AppText } from './AppText'
 import { router } from 'expo-router'
 import { cancelMedication } from '../notifications/scheduler'
+import { enviarAgendaParaCaixa } from '../hooks/useBox'
+import { MedIconBox } from '../components/MedIconBox'
+import { isLowStock as checkLowStock } from '../services/doseService'
+
+
 
 type HomeSlotsProps = {
     medications: Medication[]
@@ -65,28 +70,40 @@ export function HomeSlots({ medications, onDeleted }: HomeSlotsProps) {
                     text: 'Excluir',
                     style: 'destructive',
                     onPress: async () => {
-                        try {
+                    try {
                         const userId = auth.currentUser?.uid
 
-                            if (!userId) {
-                                Alert.alert('Erro', 'Usuário não está logado.')
-                                swipeRefs.current[slotNumber]?.close()
-                                return
-                            }
-
-                            await deleteDoc(doc(db, 'users', userId, 'medications', med.id))
-                            onDeleted?.(med.id)
-
-                            try {
-                                await cancelMedication(med.id)
-                            } catch (e) {
-                                console.warn('Falha ao cancelar notificações', e)
-                            }
-                        } catch (error) {
-                            Alert.alert('Erro', 'Não foi possível excluir o medicamento.')
+                        if (!userId) {
+                            Alert.alert('Erro', 'Usuário não está logado.')
                             swipeRefs.current[slotNumber]?.close()
+                            return
                         }
-                    },
+
+                        await deleteDoc(doc(db, 'users', userId, 'medications', med.id))
+                        onDeleted?.(med.id)
+
+                        try {
+                            await cancelMedication(med.id)
+                        } catch (e) {
+                            console.warn('Falha ao cancelar notificações', e)
+                        }
+
+                        // Atualiza a caixa para ela parar de tocar o remédio excluído
+                        try {
+                            const ok = await enviarAgendaParaCaixa()
+                            if (!ok) console.log('Sem caixa vinculada, nada a sincronizar')
+                        } catch (e) {
+                            console.warn('Falha ao enviar agenda para a caixa', e)
+                            Alert.alert(
+                                'Medicamento excluído',
+                                'Mas não foi possível atualizar a caixa. Use "Sincronizar" depois.',
+                            )
+                        }
+                    } catch (error) {
+                        Alert.alert('Erro', 'Não foi possível excluir o medicamento.')
+                        swipeRefs.current[slotNumber]?.close()
+                    }
+                },
                 },
                 ],
                 { 
@@ -101,18 +118,15 @@ export function HomeSlots({ medications, onDeleted }: HomeSlotsProps) {
             {totalSlots.map((slotNumber) => {
                 const med = medications.find((m) => m.medSlot === `slot_${slotNumber}`)
 
-                const isLowStock = med?.medRepetitions
-                    ? med.medStock <= med.medStockConsumption
-                    : false
+                const isLowStock = med ? checkLowStock(med) : false
 
                 const card = (
                     <Pressable style={styles.slotCard}>
-                        <View style={styles.slotIconContainer}>
-                        </View>
+                        <MedIconBox med={med}/>
 
                         <View style={styles.slotInfo}>
-                            <View style={styles.slotHeaderRow}>
-                                <AppText style={styles.slotTitle}>Slot {slotNumber}</AppText>
+                            <View style={styles.slotHeader}>
+                                <AppText style={styles.slotTitle}>Compartimento {slotNumber}</AppText>
                                 {isLowStock && (
                                     <Pressable
                                         style={styles.lowStockBadge}
@@ -202,10 +216,9 @@ const styles = StyleSheet.create({
     slotInfo: {
         flex: 1,
     },
-    slotHeaderRow: {
-        flexDirection: 'row',
+    slotHeader: {
         justifyContent: 'space-between',
-        alignItems: 'center',
+        
         marginBottom: 4,
     },
     slotTitle: {
@@ -220,6 +233,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 10,
+        marginRight: 80,
     },
     lowStockText: {
         color: '#fff',

@@ -1,5 +1,4 @@
-import { collection, getDocs, query, where } from 'firebase/firestore'
-
+import { addDoc, collection, deleteDoc, getDocs, limit, orderBy, query, where } from 'firebase/firestore'
 import { auth, db } from '../config/firebaseConfig'
 import type { MedData } from '../schemas/medSchema'
 
@@ -19,6 +18,17 @@ const formatarHora = (ms: number) => {
   const d = new Date(ms)
   return `${dois(d.getHours())}:${dois(d.getMinutes())}`
 }
+
+const pegarUid = () => {
+  const uid = auth.currentUser?.uid
+  if (!uid) throw new Error('Usuário não autenticado')
+  return uid
+}
+
+const inicioDoDia = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+
+const fimDoDia = (d: Date) =>
+  new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime()
 
 // Horários (ms) em que o remédio deveria ser tomado dentro do período
 function horariosPrevistos(med: MedData, inicio: number, fim: number): number[] {
@@ -55,14 +65,18 @@ function horariosPrevistos(med: MedData, inicio: number, fim: number): number[] 
 
 // Monta o texto do relatório para o período escolhido
 export async function gerarRelatorio(de: Date, ate: Date): Promise<string> {
-  const userId = auth.currentUser?.uid
-  if (!userId) throw new Error('Usuário não autenticado')
+  const userId = pegarUid()
 
-  const inicio = new Date(de.getFullYear(), de.getMonth(), de.getDate()).getTime()
-  const fim = new Date(ate.getFullYear(), ate.getMonth(), ate.getDate(), 23, 59, 59, 999).getTime()
+  const inicio = inicioDoDia(de)
+  const fim = fimDoDia(ate)
   const agora = Date.now()
 
   const medsSnap = await getDocs(collection(db, 'users', userId, 'medications'))
+
+  // Períodos que o usuário já limpou: doses previstas neles não entram no relatório
+  const exclusoesSnap = await getDocs(collection(db, 'users', userId, 'exclusoes'))
+  const exclusoes = exclusoesSnap.docs.map((d) => d.data() as { de: number; ate: number })
+  const foiLimpo = (t: number) => exclusoes.some((e) => t >= e.de && t <= e.ate)
 
   const linhas: { quando: number; texto: string }[] = []
   let administradas = 0
@@ -80,15 +94,32 @@ export async function gerarRelatorio(de: Date, ate: Date): Promise<string> {
       )
     )
 
+    const resolvidas: number[] = []
     const confirmadas: number[] = []
 
     for (const logDoc of logsSnap.docs) {
       const log = logDoc.data()
       const previsto = log.scheduledFor as number
-      // confirmedAt é um Timestamp do Firestore; se ainda não sincronizou, usa o horário previsto
-      const confirmadoEm = log.confirmedAt?.toMillis ? log.confirmedAt.toMillis() : previsto
 
-      const mesmoDia = formatarData(confirmadoEm) === formatarData(previsto)
+      if (log.status === 'missed') {
+        linhas.push({
+          quando: previsto,
+          texto: `${formatarData(previsto)} ${formatarHora(previsto)} - ${med.medName} - Não administrada`,
+        })
+
+        naoAdministradas++
+        resolvidas.push(previsto)
+        continue
+      }
+
+      const confirmadoEm =
+        log.confirmedAt?.toMillis
+          ? log.confirmedAt.toMillis()
+          : previsto
+
+      const mesmoDia =
+        formatarData(confirmadoEm) === formatarData(previsto)
+
       const quandoTexto = mesmoDia
         ? formatarHora(confirmadoEm)
         : `${formatarData(confirmadoEm)} ${formatarHora(confirmadoEm)}`
@@ -97,8 +128,10 @@ export async function gerarRelatorio(de: Date, ate: Date): Promise<string> {
         quando: previsto,
         texto: `${formatarData(previsto)} ${formatarHora(previsto)} - ${med.medName} - Administrada às ${quandoTexto}`,
       })
+
       administradas++
       confirmadas.push(previsto)
+      resolvidas.push(previsto)
     }
 
     // Doses previstas que não têm confirmação = não administradas
@@ -109,9 +142,9 @@ export async function gerarRelatorio(de: Date, ate: Date): Promise<string> {
 
     for (const t of horariosPrevistos(med, inicio, fim)) {
       const venceu = t < agora - TOLERANCIA
-      const foiConfirmada = confirmadas.some((c) => Math.abs(c - t) < MINUTO)
+      const foiResolvida = resolvidas.some((r) => Math.abs(r - t) < MINUTO)
 
-      if (venceu && t >= inicioMed && !foiConfirmada) {
+      if (venceu && t >= inicioMed && !foiResolvida && !foiLimpo(t)) {
         linhas.push({
           quando: t,
           texto: `${formatarData(t)} ${formatarHora(t)} - ${med.medName} - Não administrada`,
@@ -131,4 +164,40 @@ export async function gerarRelatorio(de: Date, ate: Date): Promise<string> {
     '',
     ...linhas.map((l) => l.texto),
   ].join('\n')
+}
+
+// Apaga os registros do período e guarda o período limpo
+export async function limparRelatorio(de: Date, ate: Date): Promise<void> {
+  const userId = pegarUid()
+  const inicio = inicioDoDia(de)
+  const fim = fimDoDia(ate)
+
+  // Salva primeiro: se der erro ao apagar, no máximo sobram logs (não aparecem "perdidas" falsas)
+  await addDoc(collection(db, 'users', userId, 'exclusoes'), {
+    de: inicio,
+    ate: fim,
+    feitoEm: Date.now(),
+  })
+
+  const medsSnap = await getDocs(collection(db, 'users', userId, 'medications'))
+
+  for (const medDoc of medsSnap.docs) {
+    const logsSnap = await getDocs(
+      query(
+        collection(medDoc.ref, 'doseLogs'),
+        where('scheduledFor', '>=', inicio),
+        where('scheduledFor', '<=', fim)
+      )
+    )
+    await Promise.all(logsSnap.docs.map((log) => deleteDoc(log.ref)))
+  }
+}
+
+// Data da última limpeza (para mostrar na tela)
+export async function buscarUltimaExclusao(): Promise<Date | null> {
+  const snap = await getDocs(
+    query(collection(db, 'users', pegarUid(), 'exclusoes'), orderBy('feitoEm', 'desc'), limit(1))
+  )
+  if (snap.empty) return null
+  return new Date(snap.docs[0].data().feitoEm)
 }

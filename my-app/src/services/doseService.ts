@@ -1,24 +1,56 @@
-import { collection, deleteField, doc, serverTimestamp, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, deleteField, doc, getDoc, serverTimestamp, updateDoc, writeBatch } from 'firebase/firestore';
 
 import { auth, db } from '../config/firebaseConfig';
 import type { Medication } from '../schemas/medSchema';
 
-type DoseInfo = Pick<Medication, 'medStock' | 'medStockConsumption' | 'medLastConfirmed'>;
+type DoseInfo = Pick<Medication, 'medStock' | 'medStockConsumption' | 'medLastConfirmed' | 'medLastMissed'>;
 
-export function getMedRef(medId: string) {
-  const userId = auth.currentUser?.uid;
-  if (!userId) throw new Error('Usuário não autenticado');
-  return doc(db, 'users', userId, 'medications', medId);
+export const DEFAULT_MIN_STOCK = 2;
+
+// consumo <= 0 vira 1, como na caixa
+export function getConsumption(med: Pick<Medication, 'medStockConsumption'>): number {
+  return med.medStockConsumption > 0 ? med.medStockConsumption : 1;
 }
 
-// Confirma a dose `doseMs`. Retorna os campos novos para atualizar o estado local.
+// doses que ainda dá para tomar
+export function getDosesLeft(med: Pick<Medication, 'medStock' | 'medStockConsumption'>): number {
+  return Math.floor(med.medStock / getConsumption(med));
+}
+
+// estoque baixo = doses restantes <= mínimo
+export function isLowStock(
+  med: Pick<Medication, 'medStock' | 'medStockConsumption'> & { medStockMin?: number },
+): boolean {
+  return getDosesLeft(med) <= (med.medStockMin ?? DEFAULT_MIN_STOCK);
+}
+
+export type MissedDose = {
+  id: string;
+  medId: string;
+  medName: string;
+  medSlot: string;
+  doseMs: number;
+};
+
+function requireUid() {
+  const userId = auth.currentUser?.uid;
+  if (!userId) throw new Error('Usuário não autenticado');
+  return userId;
+}
+
+export function getMedRef(medId: string) {
+  return doc(db, 'users', requireUid(), 'medications', medId);
+}
+
+const missedRef = (medId: string, doseMs: number) =>
+  doc(db, 'users', requireUid(), 'missedDoses', `${medId}_${doseMs}`);
+
 export async function confirmDoseInDb(medId: string, med: DoseInfo, doseMs: number) {
-  // Já confirmada (ex.: na home e depois no alerta): não desconta o estoque duas vezes
   if (med.medLastConfirmed != null && med.medLastConfirmed >= doseMs) {
     return { medStock: med.medStock, medLastConfirmed: med.medLastConfirmed };
   }
 
-  const novoEstoque = Math.max(0, med.medStock - med.medStockConsumption);
+  const novoEstoque = Math.max(0, med.medStock - getConsumption(med));
   const medRef = getMedRef(medId);
 
   const batch = writeBatch(db);
@@ -26,17 +58,98 @@ export async function confirmDoseInDb(medId: string, med: DoseInfo, doseMs: numb
     medStock: novoEstoque,
     medLastConfirmed: doseMs,
     medSnoozedUntil: deleteField(),
+    medAutoSnooze: deleteField(), // NOVO
   });
-  // id do log = horário da dose, então confirmar duas vezes não duplica o registro
   batch.set(doc(collection(medRef, 'doseLogs'), String(doseMs)), {
     scheduledFor: doseMs,
+    status: 'confirmed',
     confirmedAt: serverTimestamp(),
   });
+  // NOVO: se a dose tinha sido marcada como perdida (ex.: usuário tomou pela caixa depois),
+  // fecha o pendente para o alerta não aparecer
+  if (med.medLastMissed === doseMs) {
+    batch.update(missedRef(medId, doseMs), { status: 'taken', resolvedAt: serverTimestamp() });
+  }
   await batch.commit();
 
   return { medStock: novoEstoque, medLastConfirmed: doseMs };
 }
 
-export async function snoozeDoseInDb(medId: string, untilMs: number) {
-  await updateDoc(getMedRef(medId), { medSnoozedUntil: untilMs });
+// Sem `auto` = adiamento manual → zera o contador de adiamentos automáticos
+export async function snoozeDoseInDb(
+  medId: string,
+  untilMs: number,
+  auto?: { doseMs: number; count: number }
+) {
+  await updateDoc(getMedRef(medId), {
+    medSnoozedUntil: untilMs,
+    medAutoSnooze: auto ?? deleteField(),
+  });
+}
+
+// Dose perdida: não mexe no estoque
+export async function missDoseInDb(
+    medId: string,
+    med: Pick<Medication, 'medName' | 'medSlot' | 'medLastConfirmed' | 'medLastMissed'>,
+    doseMs: number,
+    motivo: 'timeout' | 'usuario' = 'timeout',
+ ) {
+      if (Number(med.medLastConfirmed ?? 0) >= doseMs) return;
+      if (Number(med.medLastMissed ?? 0) >= doseMs) return;
+
+      const porUsuario = motivo === 'usuario';
+      const medRef = getMedRef(medId);
+      const batch = writeBatch(db);
+
+      batch.update(medRef, {
+        medLastMissed: doseMs,
+        medSnoozedUntil: deleteField(),
+        medAutoSnooze: deleteField(),
+      });
+      batch.set(
+        doc(collection(medRef, 'doseLogs'), String(doseMs)),
+        { scheduledFor: doseMs, status: 'missed', reason: motivo, missedAt: serverTimestamp() },
+        { merge: true },
+      );
+      batch.set(missedRef(medId, doseMs), {
+        medId,
+        medName: med.medName,
+        medSlot: String(med.medSlot).replace(/\D/g, ''),
+        doseMs,
+        status: porUsuario ? 'confirmed_missed' : 'pending',
+        createdAt: serverTimestamp(),
+        ...(porUsuario ? { resolvedAt: serverTimestamp() } : {}),
+      });
+      await batch.commit();
+}
+
+// Sim  = mantém como não administrada
+// Não  = o usuário diz que tomou → registra como tomada (desconta estoque)
+export async function resolveMissedDoseInDb(m: MissedDose, keepMissed: boolean) {
+  const ref = missedRef(m.medId, m.doseMs);
+
+  if (keepMissed) {
+    await updateDoc(ref, { status: 'confirmed_missed', resolvedAt: serverTimestamp() });
+    return;
+  }
+
+  const medRef = getMedRef(m.medId);
+  const snap = await getDoc(medRef);
+  const batch = writeBatch(db);
+
+  if (snap.exists()) {
+    const med = snap.data() as Medication;
+    batch.update(medRef, {
+      medStock: Math.max(0, med.medStock - getConsumption(med)),
+      ...(Number(med.medLastConfirmed ?? 0) < m.doseMs ? { medLastConfirmed: m.doseMs } : {}),
+    });
+    batch.set(doc(collection(medRef, 'doseLogs'), String(m.doseMs)), {
+      scheduledFor: m.doseMs,
+      status: 'confirmed',
+      confirmedAt: serverTimestamp(),
+      lateConfirmed: true,
+    });
+  }
+  batch.update(ref, { status: 'taken', resolvedAt: serverTimestamp() });
+  await batch.commit();
 }

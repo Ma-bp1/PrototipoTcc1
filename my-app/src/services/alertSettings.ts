@@ -6,8 +6,9 @@ export type AlertSettings = {
   timeConflict: boolean; // avisar conflito de horário ao salvar
   slotConflict: boolean; // avisar conflito de slot ao salvar
   vibration: boolean; // vibrar na tela de alerta da dose
-  sound: boolean; // alertas da caixa (sem efeito por enquanto)
-  light: boolean; // alertas da caixa (sem efeito por enquanto)
+  sound: boolean; // alertas da caixa 
+  light: boolean; // alertas da caixa
+  advance5: boolean; // avisar 5 minutos antes do horário da dose
 };
 
 export const DEFAULT_ALERT_SETTINGS: AlertSettings = {
@@ -18,6 +19,7 @@ export const DEFAULT_ALERT_SETTINGS: AlertSettings = {
   vibration: false,
   sound: true,
   light: true,
+  advance5: false,
 };
 
 const KEY = 'alertSettings:v1';

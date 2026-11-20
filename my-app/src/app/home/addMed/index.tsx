@@ -1,15 +1,15 @@
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Alert, ActivityIndicator} from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Switch, Pressable, ScrollView, Alert, ActivityIndicator, Image } from 'react-native'
 import { Input } from '../../../components/Input'
 import { AppText } from '../../../components/AppText'
 import TimePicker from '../../../components/TimePicker'
 import { NumberStepper } from '../../../components/NumberStepper'
 import { CustomDropdown } from '../../../components/CustomDropDown'
 import { Button } from '../../../components/Button'
-import { useForm, Controller } from 'react-hook-form'
+import { useForm, Controller, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { medSchema, type MedData } from '../../../schemas/medSchema'
-import { useState, useEffect } from 'react'
-import { useRouter, Stack, useLocalSearchParams } from 'expo-router'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter, Stack, useLocalSearchParams, useFocusEffect } from 'expo-router'
 
 import {db, auth} from '../../../config/firebaseConfig'
 import {collection, addDoc, getDoc, updateDoc, doc} from 'firebase/firestore'
@@ -17,6 +17,11 @@ import { scheduleMedication } from '../../../../src/notifications/scheduler'
 
 import { getAlertSettings } from '../../../services/alertSettings'
 import { loadMedications, findConflicts, confirmConflicts } from '../../../services/conflicts'
+import { enviarAgendaParaCaixa } from '@/src/hooks/useBox'
+import { MedIconKey } from '@/src/components/MedIcons'
+import { DEFAULT_ICON_COLOR, IconPicker } from '@/src/components/IconPicker'
+
+import { pickSmallPhoto } from '@/src/utils/pickSmallPhoto'
 
 const DAYS = [
   { label: 'D', value: 0 },
@@ -27,6 +32,20 @@ const DAYS = [
   { label: 'S', value: 5 },
   { label: 'S', value: 6 },
 ];
+
+const EMPTY_FORM: MedData = {
+    medName: '',
+    medSlot: undefined as any,
+    medRepetitions: { type: 'diario' },
+    medTime: '16:01',
+    medStock: 0,
+    medStockConsumption: 0,
+    medAdminRoute: '',
+    medDesc: '',
+    medIcon: 'pill-round',
+    medPhoto: null,
+    medIconColor: DEFAULT_ICON_COLOR,
+  }
 
 function getTimes(data: MedData): string[] {
     const match = /^(\d{1,2}):(\d{2})$/.exec(data.medTime ?? '');
@@ -44,6 +63,18 @@ function getTimes(data: MedData): string[] {
     return times;
 }
 
+type ResultadoCaixa = 'enviada' | 'sem-caixa' | 'erro'
+
+async function sincronizarCaixa(): Promise<ResultadoCaixa> {
+    try {
+        const ok = await enviarAgendaParaCaixa()
+        return ok ? 'enviada' : 'sem-caixa'
+    } catch (e) {
+        console.warn('Falha ao enviar agenda para a caixa', e)
+        return 'erro'
+    }
+}
+
 
 export default function AddMed(){
     const router = useRouter();
@@ -54,18 +85,28 @@ export default function AddMed(){
 
     const {control, handleSubmit, watch, setValue, reset, formState: {errors}} = useForm<MedData>({
         resolver: zodResolver(medSchema),
-        defaultValues: {
-            medName: '', 
-            medSlot: undefined, 
-            medRepetitions: {type: 'diario'}, 
-            medTime: '', 
-            medStock: 0, 
-            medStockConsumption: 0, 
-            medAdminRoute: '', 
-            medDesc: '', 
-            medIcon: ''
-        }   
+        defaultValues: EMPTY_FORM 
     })
+
+    useFocusEffect(
+        useCallback(() => {
+         
+          return () => {
+            
+            if (!isEditing) {
+              reset(EMPTY_FORM)
+            }
+          }
+        }, [isEditing])
+    )
+
+    useEffect(() => {
+        if (!isEditing) {
+            reset(EMPTY_FORM)
+        }
+    }, [medicineId])
+
+    const medPhoto = watch('medPhoto')
 
     async function agendarNotificacoes(id: string, data: MedData) {
         try {
@@ -110,6 +151,12 @@ export default function AddMed(){
 
     const currentRepetition = watch('medRepetitions')
 
+    function mensagemCaixa(r: ResultadoCaixa) {
+        if (r === 'enviada') return 'Agenda enviada para a caixa.'
+        if (r === 'erro') return 'Salvo, mas não foi possível enviar à caixa. Use "Sincronizar" depois.'
+        return undefined // sem caixa vinculada: não precisa avisar
+    }
+
     const onSubmit = async (data: MedData) => {
         setIsLoading(true)
         try {
@@ -138,8 +185,9 @@ export default function AddMed(){
                 });
 
                 await agendarNotificacoes(medicineId!, data);
+                const caixa = await sincronizarCaixa();
 
-                Alert.alert('Medicamento atualizado com sucesso.');
+                Alert.alert('Medicamento atualizado com sucesso.', mensagemCaixa(caixa));
                 router.back();
             } else {
                 const docRef = await addDoc(collection(db, 'users', userId, 'medications'), {
@@ -148,10 +196,13 @@ export default function AddMed(){
                 });
 
                 await agendarNotificacoes(docRef.id, data);
+                const caixa = await sincronizarCaixa();
 
-                Alert.alert('Medicamento cadastrado com sucesso.');
+                Alert.alert('Medicamento cadastrado com sucesso.', mensagemCaixa(caixa));
+                reset(EMPTY_FORM)
                 router.push('/home');
             }
+
         } catch (error) {
             console.error('Erro ao salvar medicamento no Firestore:', error)
             Alert.alert('Não foi possível salvar o medicamento.')
@@ -301,20 +352,20 @@ export default function AddMed(){
                     </View>
                     
 
-                    <AppText>Slot:</AppText>
+                    <AppText>Compartimento:</AppText>
                     <Controller
                         control={control}
                         name="medSlot" 
                         render={({ field: { value, onChange } }) => (
                             <CustomDropdown
-                                label="Slot"
+                                label="Compartimento"
                                 options={[
-                                    { label: 'Slot 1', value: 'slot_1' },
-                                    { label: 'Slot 2', value: 'slot_2' },
-                                    { label: 'Slot 3', value: 'slot_3' },
-                                    { label: 'Slot 4', value: 'slot_4' },
-                                    { label: 'Slot 5', value: 'slot_5' },
-                                    { label: 'Slot 6', value: 'slot_6' },
+                                    { label: 'Compartimento 1', value: 'slot_1' },
+                                    { label: 'Compartimento 2', value: 'slot_2' },
+                                    { label: 'Compartimento 3', value: 'slot_3' },
+                                    { label: 'Compartimento 4', value: 'slot_4' },
+                                    { label: 'Compartimento 5', value: 'slot_5' },
+                                    { label: 'Compartimento 6', value: 'slot_6' },
                                 ]}
                                 selectedValue={value}
                                 onSelect={onChange}
@@ -382,8 +433,65 @@ export default function AddMed(){
                                 />
                             )}
                         />
-                        {errors.medName && <AppText>{errors.medName.message}</AppText>}
+                        {errors.medDesc && <AppText>{errors.medDesc.message}</AppText>}
                     </View>
+
+                    <AppText> Ícone: </AppText>
+
+                    <Controller
+                        control={control}
+                        name="medPhoto"
+                        render={({ field: { value, onChange } }) => (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                {value ? (
+                                    <Image
+                                        source={{ uri: value }}
+                                        style={{ width: 48, height: 48, borderRadius: 8 }}
+                                    />
+                                ) : null}
+
+                                <Pressable
+                                    onPress={async () => {
+                                        const uri = await pickSmallPhoto()
+                                        if (uri) onChange(uri)
+                                    }}
+                                >
+                                    <AppText style={{ fontSize: 13, color: '#1B7F74' }}>
+                                        Escolher imagem da galeria...
+                                    </AppText>
+                                </Pressable>
+
+                                {value ? (
+                                    <Pressable onPress={() => onChange(null)}>
+                                        <AppText style={{ fontSize: 13, color: '#B00020' }}>Remover</AppText>
+                                    </Pressable>
+                                ) : null}
+                            </View>
+                        )}
+                    />
+
+                    <Controller
+                        control={control}
+                        name="medIcon"
+                        render={({ field: { value, onChange } }) => (
+                            <Controller
+                            control={control}
+                            name="medIconColor"
+                            render={({ field: { value: color, onChange: onColor } }) => (
+                                <IconPicker
+                                    icon={value as MedIconKey}
+                                    color={color ?? DEFAULT_ICON_COLOR}
+                                    hasPhoto={!!medPhoto}
+                                    onChangeIcon={(i) => {
+                                        onChange(i)
+                                        setValue('medPhoto', null) // Limpa a foto se o usuário escolher um ícone   
+                                    }}
+                                    onChangeColor={onColor}
+                                />
+                            )}
+                            />
+                        )}
+                    />
 
                     <Button 
                         style={{marginBottom: 130}} 
