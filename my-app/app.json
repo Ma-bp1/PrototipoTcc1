@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Chronomedi",
-    "slug": "chronomedi",
+    "slug": "my-app",
     "version": "1.0.0",
     "scheme": "chronomedi",
     "orientation": "portrait",
