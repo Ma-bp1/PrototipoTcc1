@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "my-app",
-    "slug": "my-app",
+    "name": "Chronomedi",
+    "slug": "chronomedi",
     "version": "1.0.0",
-    "scheme": "myapp",
+    "scheme": "chronomedi",
     "orientation": "portrait",
     "icon": "./assets/android-icon-foreground.png",
     "userInterfaceStyle": "light",
