@@ -39,6 +39,10 @@ export default function esqueciSenha(){
                     Recuperar Senha
                 </AppText>
 
+                <AppText style={{marginBottom: 10, margin: 10, alignItems: 'center', textAlign: 'center', color: '#198982'}}> 
+                    Digite seu e-mail cadastrado para receber um link de recuperação. 
+                </AppText>
+
                 <AppText> E-mail </AppText>
                 <View style={{width: '90%'}}>
                     <Controller
