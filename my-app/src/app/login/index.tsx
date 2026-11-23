@@ -12,6 +12,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth'
 import { auth } from '../../config/firebaseConfig'
 import { loginSchema, type LoginData } from '../../schemas/authSchema'
 import { PasswordInput } from '@/src/components/PasswordInput'
+import { QuestionButton } from '@/src/components/QuestionButton'
 
 
 export default function Login(){
@@ -143,12 +144,23 @@ export default function Login(){
                 <Link href='/signUp' asChild>
                     <AppText fontSize={18} style={{textAlign: 'left', marginLeft: 40, marginTop: 10, width: '100%', color: '#198289'}}> Não tem cadastro ainda? Cadastre-se. </AppText>
                 </Link>
-                
-                
+                   
+
                 <Button 
                     label={isLoading ? 'Entrando...' : 'Entrar'}
                     onPress={ handleSubmit(handleLoginData) }
                 />
+
+                <View style={{ position: 'absolute', bottom: 30, width: '90%', paddingBottom: 30}}>
+                    <QuestionButton
+                        titulo='Como faço login?'
+                        paragrafos={[
+                            'Cada caixa Chronomedi vem com um endereço de IP único correspondente ao ESP32 utilizado na confecção da caixa. Insira o IP da sua para continuar.'
+                        ]}
+                    />
+                    
+                </View>
+                
             </ScrollView>
         </KeyboardAvoidingView>
     )
